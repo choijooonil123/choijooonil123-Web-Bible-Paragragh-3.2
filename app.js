@@ -1,9 +1,5 @@
 /* --------- Utils --------- */
 
-// ===== [BOOK-HEAD CHIPS] 각 책의 1장 첫 단락 '설교' 오른쪽에 칩스 배치 =====
-// ===== [BOOK-HEAD CHIPS v2] 각 책의 1장 첫 단락 '설교' 오른쪽에 칩스 배치 (견고) =====
-// ===== [BOOK HEAD CHIPS] 각 책의 1장 첫 단락 '설교' 오른쪽에 칩스 주입 =====
-// === [REPLACE] 각 책 1장 첫 단락 '설교' 오른쪽 칩스 → '내용흐름' 편집기 열기 ===
 // ===== [BOOK HEAD CHIPS] 각 책의 1장 첫 단락 '설교' 오른쪽에 칩스 주입 =====
 
 function ensureBookHeadChips(){
@@ -89,125 +85,6 @@ function ensureBookHeadChips(){
 }
 
 window.ensureBookHeadChips = ensureBookHeadChips;
-
-/*
-function ensureBookHeadChips(){
-  const doc = document;
-
-  // 1) 책 노드 찾기: #tree 바로 아래 details(책) + 혹시 class="book"인 것도 함께
-  const books = doc.querySelectorAll('#tree > details, details.book');
-  if (!books.length) {
-    console.warn('[bookchips] 책(details) 없음: #tree 구조를 확인하세요.');
-    return;
-  }
-
-  books.forEach((bookEl, bookIdx) => {
-    try{
-      // 2) 1장 + 첫 단락
-      const ch1 = bookEl.querySelector(':scope > .chapters > details') || bookEl.querySelector('details');
-      if (!ch1) {
-        // 장이 아직 접히거나 lazy-render라면 스킵
-        // console.debug('[bookchips] 챕터 없음', bookIdx);
-        return;
-      }
-      const p1  = ch1.querySelector(':scope > .paras > details.para') || ch1.querySelector('details.para');
-      if (!p1) {
-        // console.debug('[bookchips] 첫 단락 없음', bookIdx);
-        return;
-      }
-
-      // 3) 툴바 확보 (없으면 보강 생성)
-      let tb = p1.querySelector('.ptoolbar');
-      if (!tb) {
-        // pbody 맨 위에 최소 형태로 생성
-        const body = p1.querySelector('.pbody') || p1;
-        tb = doc.createElement('div');
-        tb.className = 'ptoolbar';
-        body.insertAdjacentElement('afterbegin', tb);
-      }
-
-      // 4) 설교 버튼 확보 (없으면 보강 생성; 클릭 바인딩은 기존 위임 로직 그대로 활용)
-      let sermBtn = tb.querySelector('.sermBtn');
-      if (!sermBtn) {
-        sermBtn = doc.createElement('button');
-        sermBtn.className = 'sermBtn';
-        sermBtn.textContent = '설교';
-        tb.appendChild(sermBtn);
-      }
-
-      // 5) 기존 칩스 제거(중복 방지)
-      tb.querySelectorAll('.bookhead-chips').forEach(n => n.remove());
-
-      // 6) 칩스 생성 후 '설교' 버튼 오른쪽에 삽입
-      const chips = doc.createElement('span');
-      chips.className = 'bookhead-chips';
-      chips.innerHTML = `
-        <button type="button" class="book-chip" data-type="basic">기본이해</button>
-        <button type="button" class="book-chip" data-type="structure">내용구조</button>
-        <button type="button" class="book-chip" data-type="summary">메세지요약</button>
-      `;
-
-      // 기본이해, 내용구조, 메세지요약 버튼의 편집기 호출하기 20251114 01:34
-        // ===== 기본이해·내용구조·메세지요약 → 내용흐름 편집기 연결 =====
-        const chipBasic = chips.querySelector('button[data-type="basic"]');
-        const chipStruct = chips.querySelector('button[data-type="structure"]');
-        const chipSummary = chips.querySelector('button[data-type="summary"]');
-
-        // chips가 위치한 단락에서 book/chapter 정보 추출
-        const paraEl = chips.closest('details.para');
-        const summaryEl = paraEl?.querySelector(':scope > summary .ptitle');
-
-        if (summaryEl){
-        const book = summaryEl.dataset.book;
-        const chap = parseInt(summaryEl.dataset.ch, 10);
-        const paraIdx = parseInt(summaryEl.dataset.idx, 10);
-
-        // 📌 내용흐름 편집기와 같은 에디터 호출
-        const openBookChipEditor = (ctxType) => {
-
-            // 🌟 내용흐름 편집기와 동일한 에디터 오픈
-            openSingleDocEditor('unit'); // 단위성경속 맥락 편집기 호출
-
-            // 책 단위 저장을 위해 context metadata 선언
-            sermonEditor.dataset.ctxType  = ctxType;   // book-basic / book-struct / book-summary
-            sermonEditor.dataset.bookName = book;      // 저장 시 책이름 사용
-        };
-
-        if (chipBasic)
-            chipBasic.onclick = () => openBookChipEditor('book-basic');
-
-        if (chipStruct)
-            chipStruct.onclick = () => openBookChipEditor('book-struct');
-
-        if (chipSummary)
-            chipSummary.onclick = () => openBookChipEditor('book-summary');
-        }
-
-      sermBtn.insertAdjacentElement('afterend', chips);
-
-      // 7) 클릭 → 책 단위 에디터 열기
-      const bookSummary = bookEl.querySelector(':scope > summary');
-      // chips.addEventListener('click', (e)=>{
-      //   const b = e.target.closest('.book-chip');
-      //   if (!b) return;
-      //   if (typeof openBookEditor === 'function') {
-      //     openBookEditor(b.dataset.type, bookSummary);
-      //   } else {
-      //     alert('openBookEditor가 정의되어 있지 않습니다.');
-      //   }
-      //   e.stopPropagation();
-      //   e.preventDefault();
-      // });
-
-    } catch(err){
-      console.warn('[bookchips] 처리 중 오류:', err);
-    }
-  });
-}
-
-window.ensureBookHeadChips = ensureBookHeadChips;
-*/
-
 
 // ===== [GLOBAL BOOK CHIPS] 헤더의 '서식가져오기' 오른쪽에 전역 칩스 =====
 // ===== [GLOBAL BOOK CHIPS] '서식가져오기' 오른쪽 칩스 주입 =====
@@ -2463,38 +2340,86 @@ function initSermonPopup(win){
     NpushHistory();
   }
 
+  // 🔁 에디터 블록 이벤트 바인딩
   function NbindBlockEvents(){
-    N$$('.editor-block').forEach(block =>{
-      const content = block.querySelector('.content');
+    const blocks = neRoot.querySelectorAll('.editor-block');
 
-      content.addEventListener('keydown', e=>{
-        if(e.key==='/' && !e.shiftKey){ NshowSlash(block); return; }
-        if(e.key==='Enter'){
-          if(NgetType(block)==='code') return;
-          e.preventDefault(); NsplitBlock(block);
-        }
-        if((e.metaKey||e.ctrlKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); Nundo(); }
-        if(((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==='z')||((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='y')){ e.preventDefault(); Nredo(); }
+    blocks.forEach(block =>{
+      const content = block.querySelector('.content');
+      if (!content) return;
+
+      // 입력 시 블록 HTML 저장 + 자동저장
+      content.addEventListener('input', ()=> {
+        NsaveBlockHTML(block);
+        NscheduleAutosave();
       });
 
-      content.addEventListener('input', ()=>{ NsaveBlockHTML(block); NscheduleAutosave(); });
-      content.addEventListener('mouseup', NshowBubbleMaybe);
-      content.addEventListener('keyup',   NshowBubbleMaybe);
-    });
+      // 마우스로 드래그 후 선택 → 마우스에서 손 뗄 때 버블 표시
+      content.addEventListener('mouseup', ()=> {
+        setTimeout(NshowBubbleMaybe, 0);
+      });
 
-    N$$('.editor-block .handle').forEach(h=>{
-      h.addEventListener('click',()=>{
-        const block = h.closest('.editor-block');
-        const idx = NindexById(block.dataset.id);
-        if(idx<=0) return;
-        const t = NSTATE.blocks[idx]; NSTATE.blocks[idx]=NSTATE.blocks[idx-1]; NSTATE.blocks[idx-1]=t;
-        Nrender(); NscheduleAutosave();
+      // 방향키로 선택 변경 / Shift+방향키 등 → 버블 표시
+      content.addEventListener('keyup', ()=> {
+        setTimeout(NshowBubbleMaybe, 0);
+      });
+
+      // 슬래시 명령(기능 유지)
+      content.addEventListener('keydown', e => {
+        if (e.key === '/' && !e.shiftKey) {
+          NshowSlash(block);
+          return;
+        }
+        if (e.key === 'Enter') {
+          if (NgetType(block) === 'code') return;
+          e.preventDefault();
+          NsplitBlock(block);
+        }
+        if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          Nundo();
+        }
+        if (((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'z') ||
+            ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y')) {
+          e.preventDefault();
+          Nredo();
+        }
       });
     });
   }
 
+  // 🔁 플로팅툴바 표시 로직
+  function NshowBubbleMaybe(){
+    const sel = w.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+      neBubble.classList.add('hidden');
+      return;
+    }
 
-  // 플로팅툴바 
+    const range = sel.getRangeAt(0);
+    const node  = range.commonAncestorContainer;
+    const el    = (node.nodeType === 1 ? node : node.parentElement);
+
+    // 선택이 에디터 밖이면 버블 숨김
+    if (!el || !neRoot.contains(el)) {
+      neBubble.classList.add('hidden');
+      return;
+    }
+
+    // 선택 영역 위치 계산
+    let rect = range.getBoundingClientRect();
+    if (!rect || (rect.width === 0 && rect.height === 0)) {
+      neBubble.classList.add('hidden');
+      return;
+    }
+
+    neBubble.style.left = (rect.left + w.scrollX) + 'px';
+    neBubble.style.top  = (rect.top  + w.scrollY - 42) + 'px';
+    neBubble.classList.remove('hidden');
+  }
+
+  /*
+  // 플로팅툴바
   function NshowBubbleMaybe(){
     const sel = w.getSelection();
     if(!sel || sel.isCollapsed){
@@ -2506,7 +2431,8 @@ function initSermonPopup(win){
     neBubble.style.top  = (rect.top  + w.scrollY - 42) + 'px';
     neBubble.classList.remove('hidden');
   }
-
+  */
+ 
   // 플로팅툴바 
   neBubble.addEventListener('mousedown', e=> e.preventDefault());
 
@@ -3349,96 +3275,6 @@ if (document.readyState === 'loading') {
 } else {
   bindBookChipsToFlowEditor();
 }
-/*
-// === [BOOK-CHIPS → '내용흐름' 편집기 강제 재사용] ==========================
-function bindFlowEditorToBookChips(){
-  const tree = document.getElementById('tree');
-  if(!tree) return;
-
-  // 현재 열린 책 수 확인 (2권 이상 열려 있으면 제한)
-  const openedBooks = [...tree.querySelectorAll('details.book[open]')];
-  if (openedBooks.length > 1) {
-    alert('2개 이상 성경이 열려 있습니다. 한 권만 연 다음 다시 시도하세요.');
-    return;
-  }
-
-  // 열린 책 또는 첫 책
-  const bookEl = openedBooks[0] || tree.querySelector('#tree > details.book');
-  if(!bookEl) return;
-
-  // 이 책의 1장 / 첫 단락
-  const ch1 = bookEl.querySelector(':scope > .chapters > details') || bookEl.querySelector('details');
-  const p1  = ch1?.querySelector(':scope > .paras > details.para') || ch1?.querySelector('details.para');
-  if(!p1) return;
-
-  // '내용흐름' 원래 버튼(트리거)
-  const flowBtn =
-    p1.querySelector('.ptoolbar [data-action="flow"]') ||
-    p1.querySelector('.ptoolbar .btn-flow') ||
-    [...p1.querySelectorAll('.ptoolbar button')].find(b => (b.textContent||'').trim() === '내용흐름');
-  if(!flowBtn) return;
-
-  // 설교 버튼 오른쪽에 있는 3칩(기본이해/내용구조/메세지요약) 컨테이너
-  const toolbar = p1.querySelector('.ptoolbar');
-  if(!toolbar) return;
-  const chipsWrap =
-    toolbar.querySelector('.bookhead-chips') ||
-    toolbar.querySelector('.book-chips') ||
-    toolbar;
-
-  // 칩 셀렉터(여러 구현 호환)
-  const sel = [
-    '.book-chip[data-type="basic"]',
-    '.book-chip[data-type="structure"]',
-    '.book-chip[data-type="summary"]',
-    '.chip-basic','.chip-structure','.chip-summary'
-  ].join(',');
-
-  const chips = [...chipsWrap.querySelectorAll(sel)];
-  if(!chips.length) return;
-
-  chips.forEach((chip)=>{
-    if (chip.dataset.flowBind === '1') return;
-
-    // 기존 클릭 리스너 제거(클론 교체)
-    const fresh = chip.cloneNode(true);
-    chip.replaceWith(fresh);
-
-    fresh.dataset.flowBind = '1';
-    fresh.addEventListener('click', (e)=>{
-      e.preventDefault();
-      e.stopPropagation();
-
-      // 클릭 시점에도 다중 오픈 방지
-      const nowOpen = [...tree.querySelectorAll('details.book[open]')];
-      if (nowOpen.length > 1) {
-        alert('편집기는 한 권만 열린 상태에서 사용할 수 있습니다.');
-        return;
-      }
-
-      // '내용흐름' 편집기를 그대로 호출
-      flowBtn.click();
-
-      // 에디터 제목을 칩 라벨로 교체(모양/스타일은 내용흐름 그대로 유지)
-      requestAnimationFrame(()=>{
-        const dlg =
-          document.querySelector('.flow-editor-modal') ||
-          document.querySelector('.editor-modal') ||
-          document.querySelector('.wbp-editor') ||
-          document.querySelector('.modal');
-        const titleEl =
-          dlg?.querySelector('.modal-title') ||
-          dlg?.querySelector('.editor-title') ||
-          dlg?.querySelector('.title');
-        if(titleEl){
-          titleEl.textContent = (fresh.textContent||'').trim();
-        }
-      });
-    });
-  });
-}
-*/
-// ==========================================================================
 
 // 초기/재렌더 훅 연결(중복 호출 허용, 내부에서 자체 가드)
 if (document.readyState === 'loading') {
