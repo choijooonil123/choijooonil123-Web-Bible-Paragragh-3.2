@@ -2493,6 +2493,8 @@ function initSermonPopup(win){
     });
   }
 
+
+  // 플로팅툴바 
   function NshowBubbleMaybe(){
     const sel = w.getSelection();
     if(!sel || sel.isCollapsed){
@@ -2505,8 +2507,10 @@ function initSermonPopup(win){
     neBubble.classList.remove('hidden');
   }
 
+  // 플로팅툴바 
   neBubble.addEventListener('mousedown', e=> e.preventDefault());
 
+  // 플로팅툴바
   neBubble.addEventListener('click', e=>{
     const btn = e.target.closest('button'); 
     if(!btn) return;
