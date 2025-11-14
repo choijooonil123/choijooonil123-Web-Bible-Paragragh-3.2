@@ -2280,6 +2280,8 @@ function initSermonPopup(win){
   const neBubble  = $('neBubble');
   const neSlash   = $('neSlash');
   const neAutosave= $('neAutosave');
+  const editorMain = neRoot.closest('main') || d.body;
+
 
   const NSTATE = { blocks: [], history: [], cursor: -1, docId: null };
 
@@ -2388,7 +2390,7 @@ function initSermonPopup(win){
     });
   }
 
-  // 🔁 플로팅툴바 표시 로직
+  // 🔁 플로팅툴바 표시 (main 기준 좌표로 보정)
   function NshowBubbleMaybe(){
     const sel = w.getSelection();
     if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
@@ -2400,23 +2402,29 @@ function initSermonPopup(win){
     const node  = range.commonAncestorContainer;
     const el    = (node.nodeType === 1 ? node : node.parentElement);
 
-    // 선택이 에디터 밖이면 버블 숨김
+    // 선택이 에디터 블록 밖이면 숨김
     if (!el || !neRoot.contains(el)) {
       neBubble.classList.add('hidden');
       return;
     }
 
-    // 선택 영역 위치 계산
+    // 선택 영역의 윈도우 기준 rect
     let rect = range.getBoundingClientRect();
     if (!rect || (rect.width === 0 && rect.height === 0)) {
       neBubble.classList.add('hidden');
       return;
     }
 
-    neBubble.style.left = (rect.left + w.scrollX) + 'px';
-    neBubble.style.top  = (rect.top  + w.scrollY - 42) + 'px';
+    // 🔹 main 기준 좌표로 변환
+    const mainRect = editorMain.getBoundingClientRect();
+    const left = rect.left - mainRect.left + editorMain.scrollLeft;
+    const top  = rect.top  - mainRect.top  + editorMain.scrollTop - 42;
+
+    neBubble.style.left = left + 'px';
+    neBubble.style.top  = top  + 'px';
     neBubble.classList.remove('hidden');
   }
+
 
   /*
   // 플로팅툴바
@@ -2432,7 +2440,7 @@ function initSermonPopup(win){
     neBubble.classList.remove('hidden');
   }
   */
- 
+
   // 플로팅툴바 
   neBubble.addEventListener('mousedown', e=> e.preventDefault());
 
