@@ -915,8 +915,6 @@ function safeBindFmtButtons(){
 }
 // ===== [FORMAT-PERSIST UI] 버튼 생성/바인딩 END =====
 
-// ===== [UNIT-EDITOR] ptitle 옆 버튼 주입 =====
-// ===== [UNIT-EDITOR] ptitle 옆 버튼 주입 (견고 버전) =====
 // ===== [UNIT-EDITOR] ptitle 옆 버튼 주입 (전방위 견고 버전) =====
 function ensureUnitChips(){
   // 열려있는 단락이 없으면 모든 단락에 시도(최초 로드 대비)
@@ -2290,6 +2288,7 @@ main { height:auto !important; overflow:visible !important; }
     <button data-mark="code">` + '\\`code\\`' + `</button>
     <button data-mark="highlight">HL</button>
     <button data-action="link">🔗</button>
+    <button data-action="clearFmt">서식제거</button> <!-- 🔹 추가 -->
   </div>
 
   <div id="neSlash" class="slash hidden"></div>
@@ -2496,22 +2495,41 @@ function initSermonPopup(win){
 
   function NshowBubbleMaybe(){
     const sel = w.getSelection();
-    if(!sel || sel.isCollapsed){ neBubble.classList.add('hidden'); return; }
+    if(!sel || sel.isCollapsed){
+      neBubble.classList.add('hidden');
+      return;
+    }
     const rect = sel.getRangeAt(0).getBoundingClientRect();
     neBubble.style.left = (rect.left + w.scrollX) + 'px';
     neBubble.style.top  = (rect.top  + w.scrollY - 42) + 'px';
     neBubble.classList.remove('hidden');
   }
+
   neBubble.addEventListener('mousedown', e=> e.preventDefault());
+
   neBubble.addEventListener('click', e=>{
-    const btn = e.target.closest('button'); if(!btn) return;
-    const mark = btn.dataset.mark; const act = btn.dataset.action;
+    const btn = e.target.closest('button'); 
+    if(!btn) return;
+
+    const mark = btn.dataset.mark; 
+    const act  = btn.dataset.action;
+
     if(mark){
-      d.execCommand(mark==='highlight'?'backColor':mark, false, mark==='highlight'? '#6655007a': null);
-    } else if(act==='link'){
-      const url = w.prompt('링크 URL'); if(url) d.execCommand('createLink', false, url);
+      d.execCommand(
+        mark==='highlight' ? 'backColor' : mark,
+        false,
+        mark==='highlight' ? '#6655007a' : null
+      );
+    } else if(act === 'link'){
+      const url = w.prompt('링크 URL');
+      if(url) d.execCommand('createLink', false, url);
+    } else if(act === 'clearFmt'){          // 🔹 서식제거 추가
+      d.execCommand('removeFormat', false, null);
+      d.execCommand('unlink', false, null); // 링크도 함께 제거하고 싶으면 유지
     }
-    NshowBubbleMaybe(); NscheduleAutosave();
+
+    NshowBubbleMaybe();
+    NscheduleAutosave();
   });
 
   const N_SLASH = [
