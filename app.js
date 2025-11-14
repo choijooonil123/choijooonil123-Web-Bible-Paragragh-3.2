@@ -1099,10 +1099,10 @@ let EDITOR_READER = { playing:false, u:null, synth:window.speechSynthesis||null 
 /* --------- Boot --------- */
 (async function boot(){
   try{
-    BIBLE = await tryFetchJSON('bible-paragraph.json');
+    BIBLE = await tryFetchJSON('bible-paragraphs.json');
   }catch(_){
     try{ BIBLE = await tryFetchJSON('bible_paragraphs.json'); }
-    catch(e){ status('bible-paragraph.json을 찾을 수 없습니다. 같은 폴더에 두고 다시 열어주세요.'); return; }
+    catch(e){ status('bible-paragraphs.json을 찾을 수 없습니다. 같은 폴더에 두고 다시 열어주세요.'); return; }
   }
   buildTree();
   ensureSermonButtons();   // 🔧 설교 버튼 누락 시 보강
@@ -2907,7 +2907,7 @@ function initSermonPopup(win){
         return j && j.books ? j.books : null;
       }catch(_){ return null; }
     }
-    __BOOKS_CACHE = await tryLoad('bible_paragraphs.json') || await tryLoad('bible-paragraph.json');
+    __BOOKS_CACHE = await tryLoad('bible_paragraphs.json') || await tryLoad('bible-paragraphs.json');
     if(!__BOOKS_CACHE) throw new Error('성경 데이터(BIBLE)를 불러올 수 없습니다.');
     return __BOOKS_CACHE;
   }
