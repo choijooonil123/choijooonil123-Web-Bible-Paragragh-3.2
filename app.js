@@ -3393,4 +3393,69 @@ if(document.readyState==='loading'){
   rebindBookChipsToFlowEditor();
 }
 
+// =======================
+//  UNIT CONTEXT 저장 루틴
+// =======================
+
+// 1) 서버 또는 로컬스토리지 저장 함수
+async function saveUnitContext(type, book, chap, paraIdx, text){
+  try {
+    // 🔹 서버 저장 (API 사용 시)
+    const res = await fetch(AI_ENDPOINT, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        type,
+        book,
+        chap,
+        paraIdx,
+        text
+      })
+    });
+
+    // 🔹 실패시 로컬백업
+    if (!res.ok){
+      console.warn("API 저장 실패 → 로컬스토리지 백업");
+      const key = `WBP3_UNITCTX:${book}:${chap}:${paraIdx}:${type}`;
+      localStorage.setItem(key, text);
+    }
+
+    status("저장되었습니다.");
+  } catch (err){
+    console.error(err);
+    status("저장 실패(오프라인) → 로컬 백업");
+    const key = `WBP3_UNITCTX:${book}:${chap}:${paraIdx}:${type}`;
+    localStorage.setItem(key, text);
+  }
+}
+
+
+// =======================
+//  편집기 저장 버튼 이벤트
+// =======================
+document.addEventListener('click', (e)=>{
+  if (!e.target.closest) return;
+
+  const btn = e.target.closest('[data-uc-save]');
+  if (!btn) return;
+
+  const host = document.getElementById('unitEditor');
+  if (!host) return;
+
+  const type     = host.dataset.type;
+  const book     = host.dataset.book;
+  const chap     = parseInt(host.dataset.ch, 10);
+  const paraIdx  = parseInt(host.dataset.idx, 10);
+  const textarea = host.querySelector('textarea');
+
+  if (!textarea){
+    alert("입력창을 찾을 수 없습니다.");
+    return;
+  }
+
+  const text = textarea.value;
+
+  saveUnitContext(type, book, chap, paraIdx, text);
+});
+
 })();
