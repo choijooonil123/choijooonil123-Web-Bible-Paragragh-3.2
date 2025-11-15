@@ -3458,4 +3458,89 @@ document.addEventListener('click', (e)=>{
   saveUnitContext(type, book, chap, paraIdx, text);
 });
 
+// =======================
+//  UNIT CONTEXT 편집기
+//  (기본이해 / 내용흐름 / 메세지요약 공용)
+// =======================
+function openUnitContextEditor(book, chap, paraIdx, type){
+  // 🔹 타입 기본값 (옛 코드에서 3개만 넘기는 경우 대비)
+  if (!type) type = 'basic';
+
+  // 🔹 타입 → 한글 라벨
+  const typeLabelMap = {
+    basic: '기본이해',
+    structure: '내용흐름',
+    flow: '내용흐름',
+    summary: '메세지요약'
+  };
+  const typeLabel = typeLabelMap[type] || type;
+
+  // 🔹 편집기 컨테이너 확보 (없으면 생성)
+  let host = document.getElementById('unitEditor');
+  if (!host){
+    host = document.createElement('div');
+    host.id = 'unitEditor';
+    host.className = 'unit-editor-modal';
+    document.body.appendChild(host);
+  }
+
+  // 🔹 어떤 단락을 편집 중인지 메타 정보 기록
+  host.dataset.book = book;
+  host.dataset.ch   = String(chap);
+  host.dataset.idx  = String(paraIdx);
+  host.dataset.type = type;
+
+  // 🔹 화면 상단에 보여줄 단락 제목(선택)
+  let refLabel = '';
+  try {
+    const paraSel = `details.para[data-book="${book}"][data-ch="${chap}"][data-idx="${paraIdx}"]`;
+    const paraEl = document.querySelector(paraSel);
+    const titleEl = paraEl?.querySelector('summary .ptitle');
+    if (titleEl){
+      refLabel = titleEl.textContent.trim();
+    } else {
+      refLabel = `${book} ${chap}장 단락 ${paraIdx + 1}`;
+    }
+  } catch (e){
+    refLabel = `${book} ${chap}장 단락 ${paraIdx + 1}`;
+  }
+
+  // 🔹 편집기 HTML 템플릿
+  host.innerHTML = `
+    <div class="uc-wrap">
+      <div class="uc-header">
+        <div class="uc-title">
+          <span class="uc-ref">${refLabel}</span>
+          <span class="uc-type"> · ${typeLabel} 편집</span>
+        </div>
+        <button type="button" class="uc-close" data-uc-close>×</button>
+      </div>
+      <div class="uc-body">
+        <textarea class="uc-input" spellcheck="false"
+          placeholder="${typeLabel} 내용을 입력하세요"></textarea>
+      </div>
+      <div class="uc-footer">
+        <button type="button" class="uc-save" data-uc-save>저장</button>
+        <button type="button" class="uc-cancel" data-uc-close>닫기</button>
+      </div>
+    </div>
+  `;
+
+  // 🔹 로컬스토리지에 저장된 내용 불러오기
+  const key   = `WBP3_UNITCTX:${book}:${chap}:${paraIdx}:${type}`;
+  const saved = localStorage.getItem(key);
+  const ta    = host.querySelector('.uc-input');
+  if (ta){
+    ta.value = saved != null ? saved : '';
+    ta.focus();
+  }
+
+  // 🔹 닫기 버튼 처리
+  host.querySelectorAll('[data-uc-close]').forEach(btn=>{
+    btn.onclick = () => {
+      host.remove();
+    };
+  });
+}
+
 })();
