@@ -2941,7 +2941,7 @@ function startInlineTitleEdit(){ /* 필요 시 실제 구현으로 교체 */ }
 
   let savedRange = null;
 
-  function inVerse(){
+  function inVerse(){   // 플로팅 툴바
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return false;
 
