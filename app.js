@@ -2943,11 +2943,24 @@ function startInlineTitleEdit(){ /* 필요 시 실제 구현으로 교체 */ }
 
   function inVerse(){
     const sel = window.getSelection();
-    if(!sel || sel.rangeCount===0) return false;
-    const c = sel.getRangeAt(0).commonAncestorContainer;
-    const el = (c.nodeType===1 ? c : c.parentElement);
-    return !!(el && docEl.contains(el) && el.closest('.verse'));
+    if (!sel || sel.rangeCount === 0) return false;
+
+    const c  = sel.getRangeAt(0).commonAncestorContainer;
+    const el = (c.nodeType === 1 ? c : c.parentElement);
+    if (!el) return false;
+
+    // 🔹 1) 설교 모달 / 설교 목록 쪽에서 선택된 건 전부 무시
+    if (el.closest('#modalWrap') || el.closest('.modal') || el.closest('#sermonList')) {
+      return false;
+    }
+
+    // 🔹 2) 오직 성경 본문(#doc 안 .verse)일 때만 true
+    const docEl = document.getElementById('doc');
+    if (!docEl) return false;
+
+    return !!(docEl.contains(el) && el.closest('.verse'));
   }
+
   function saveSel(){
     const sel = window.getSelection();
     if(sel && sel.rangeCount>0) savedRange = sel.getRangeAt(0).cloneRange();
