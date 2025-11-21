@@ -1719,7 +1719,7 @@ function buildTree(){
         if (!formatToolbar) {
           const fmtToolbar = document.createElement('div');
           fmtToolbar.className = 'pcontent-format-toolbar';
-          fmtToolbar.style.display = 'none';
+          fmtToolbar.style.display = 'none'; // 초기에는 숨김
           fmtToolbar.innerHTML = `
             <button type="button" class="fmt-btn" data-cmd="bold" title="굵게 (Ctrl+B)"><b>B</b></button>
             <button type="button" class="fmt-btn" data-cmd="italic" title="기울임 (Ctrl+I)"><i>I</i></button>
@@ -1734,18 +1734,9 @@ function buildTree(){
             </div>
           `;
           
-          const btnSummary = body.querySelector('.btnSummary');
-          if (btnSummary) {
-            btnSummary.insertAdjacentElement('afterend', fmtToolbar);
-          } else {
-            const ptoolbar = body.querySelector('.ptoolbar');
-            if (ptoolbar) {
-              ptoolbar.appendChild(fmtToolbar);
-            }
-          }
-          
           // 서식 버튼 클릭 이벤트
           fmtToolbar.addEventListener('click', (e) => {
+            e.stopPropagation(); // 이벤트 전파 방지
             const btn = e.target.closest('button');
             if (!btn) return;
             
@@ -1758,20 +1749,32 @@ function buildTree(){
               document.execCommand('foreColor', false, color);
             }
           });
+          
+          const btnSummary = body.querySelector('.btnSummary');
+          if (btnSummary) {
+            btnSummary.insertAdjacentElement('afterend', fmtToolbar);
+          } else {
+            const ptoolbar = body.querySelector('.ptoolbar');
+            if (ptoolbar) {
+              ptoolbar.appendChild(fmtToolbar);
+            }
+          }
         }
         
         // .pcontent 클릭 시 서식 버튼 영역 표시 (중복 등록 방지)
         if (!pcontent.dataset.formatListenerAttached) {
           pcontent.dataset.formatListenerAttached = 'true';
           pcontent.addEventListener('click', (e) => {
-            // 버튼 클릭은 무시 (서식 버튼 자체 클릭은 처리하지 않음)
+            // 서식 버튼 영역 클릭은 무시
             if (e.target.closest('.pcontent-format-toolbar')) {
               return;
             }
             
             // 다른 단락의 서식 버튼 영역 숨김
             document.querySelectorAll('.pcontent-format-toolbar').forEach(tb => {
-              if (tb !== body.querySelector('.pcontent-format-toolbar')) {
+              const paraEl = tb.closest('details.para');
+              const currentParaEl = body.closest('details.para');
+              if (paraEl !== currentParaEl) {
                 tb.style.display = 'none';
               }
             });
@@ -1780,53 +1783,6 @@ function buildTree(){
             const fmtToolbar = body.querySelector('.pcontent-format-toolbar');
             if (fmtToolbar) {
               fmtToolbar.style.display = 'flex';
-              fmtToolbar.style.gap = '4px';
-              fmtToolbar.style.alignItems = 'center';
-            } else {
-              // 서식 버튼 영역이 없으면 생성
-              const newFmtToolbar = document.createElement('div');
-              newFmtToolbar.className = 'pcontent-format-toolbar';
-              newFmtToolbar.style.display = 'flex';
-              newFmtToolbar.style.gap = '4px';
-              newFmtToolbar.style.alignItems = 'center';
-              newFmtToolbar.innerHTML = `
-                <button type="button" class="fmt-btn" data-cmd="bold" title="굵게 (Ctrl+B)"><b>B</b></button>
-                <button type="button" class="fmt-btn" data-cmd="italic" title="기울임 (Ctrl+I)"><i>I</i></button>
-                <button type="button" class="fmt-btn" data-cmd="underline" title="밑줄 (Ctrl+U)"><u>U</u></button>
-                <div class="fmt-color-palette">
-                  <button type="button" class="fmt-color-btn" data-color="#ff4d4f" title="빨강" style="background:#ff4d4f;width:20px;height:20px;border-radius:4px;border:1px solid #2a3040;"></button>
-                  <button type="button" class="fmt-color-btn" data-color="#fadb14" title="노랑" style="background:#fadb14;width:20px;height:20px;border-radius:4px;border:1px solid #2a3040;"></button>
-                  <button type="button" class="fmt-color-btn" data-color="#52c41a" title="초록" style="background:#52c41a;width:20px;height:20px;border-radius:4px;border:1px solid #2a3040;"></button>
-                  <button type="button" class="fmt-color-btn" data-color="#1677ff" title="파랑" style="background:#1677ff;width:20px;height:20px;border-radius:4px;border:1px solid #2a3040;"></button>
-                  <button type="button" class="fmt-color-btn" data-color="#722ed1" title="보라" style="background:#722ed1;width:20px;height:20px;border-radius:4px;border:1px solid #2a3040;"></button>
-                  <button type="button" class="fmt-color-btn" data-color="#ffffff" title="흰색" style="background:#ffffff;width:20px;height:20px;border-radius:4px;border:1px solid #666;"></button>
-                </div>
-              `;
-              
-              // 서식 버튼 클릭 이벤트
-              newFmtToolbar.addEventListener('click', (e) => {
-                const btn = e.target.closest('button');
-                if (!btn) return;
-                
-                const cmd = btn.dataset.cmd;
-                const color = btn.dataset.color;
-                
-                if (cmd) {
-                  document.execCommand(cmd, false, null);
-                } else if (color) {
-                  document.execCommand('foreColor', false, color);
-                }
-              });
-              
-              const btnSummary = body.querySelector('.btnSummary');
-              if (btnSummary) {
-                btnSummary.insertAdjacentElement('afterend', newFmtToolbar);
-              } else {
-                const ptoolbar = body.querySelector('.ptoolbar');
-                if (ptoolbar) {
-                  ptoolbar.appendChild(newFmtToolbar);
-                }
-              }
             }
           });
           
