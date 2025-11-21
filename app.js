@@ -4,11 +4,17 @@
 
 function ensureBookHeadChips(){
   const doc = document;
+  const tree = doc.getElementById('tree');
+  
+  // 트리가 없거나 비어있으면 조용히 반환 (트리 렌더링 전일 수 있음)
+  if (!tree || !tree.children.length) {
+    return;
+  }
 
   // 1) 책 노드 찾기
   const books = doc.querySelectorAll('#tree > details, details.book');
   if (!books.length) {
-    console.warn('[bookchips] 책(details) 없음: #tree 구조를 확인하세요.');
+    // 트리가 있지만 책이 없을 때만 경고 (트리 렌더링 중일 수 있음)
     return;
   }
 
@@ -5998,13 +6004,8 @@ if (document.readyState === 'loading') {
   bindBookChipsToFlowEditor();
 }
 
-// 초기/재렌더 훅 연결(중복 호출 허용, 내부에서 자체 가드)
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', bindFlowEditorToBookChips);
-} else {
-  bindFlowEditorToBookChips();
-}
-document.addEventListener('wbp:treeBuilt', bindFlowEditorToBookChips);
+// bindFlowEditorToBookChips 함수는 정의되지 않았으므로 호출 제거
+// 대신 bindBookHeadChipsToFlowEditor와 bindBookChipsToFlowEditor가 이미 같은 기능을 수행함
 
 // === [BOOK-CHIPS DIRECT BIND → 내용흐름 편집기 동일 기능] ================
 // === [BOOK-CHIPS DIRECT BIND → UNIT CONTEXT 편집기 사용] ================
