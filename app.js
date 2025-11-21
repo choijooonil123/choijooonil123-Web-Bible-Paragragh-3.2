@@ -1760,55 +1760,34 @@ function buildTree(){
           });
         }
         
-        // .pcontent 클릭 시 서식 버튼 영역 표시
-        pcontent.addEventListener('click', (e) => {
-          // 다른 단락의 서식 버튼 영역 숨김
-          document.querySelectorAll('.pcontent-format-toolbar').forEach(tb => {
-            if (tb !== body.querySelector('.pcontent-format-toolbar')) {
-              tb.style.display = 'none';
+        // .pcontent 클릭 시 서식 버튼 영역 표시 (중복 등록 방지)
+        if (!pcontent.dataset.formatListenerAttached) {
+          pcontent.dataset.formatListenerAttached = 'true';
+          pcontent.addEventListener('click', (e) => {
+            // 다른 단락의 서식 버튼 영역 숨김
+            document.querySelectorAll('.pcontent-format-toolbar').forEach(tb => {
+              if (tb !== body.querySelector('.pcontent-format-toolbar')) {
+                tb.style.display = 'none';
+              }
+            });
+            
+            const fmtToolbar = body.querySelector('.pcontent-format-toolbar');
+            if (fmtToolbar) {
+              fmtToolbar.style.display = 'flex';
+              fmtToolbar.style.gap = '4px';
+              fmtToolbar.style.alignItems = 'center';
             }
           });
           
-          const fmtToolbar = body.querySelector('.pcontent-format-toolbar');
-          if (fmtToolbar) {
-            fmtToolbar.style.display = 'flex';
-            fmtToolbar.style.gap = '4px';
-            fmtToolbar.style.alignItems = 'center';
-          }
-        });
-        
-        // .pcontent 영역에서 드래그 시 플로팅 툴바 비활성화
-        let isDragging = false;
-        let mousemoveTimeout = null;
-        pcontent.addEventListener('mousedown', (e) => {
-          isDragging = false;
-          // 플로팅 툴바 숨김
-          const floatingBar = document.getElementById('wbp-plbar');
-          if (floatingBar) {
-            floatingBar.hidden = true;
-          }
-        });
-        
-        pcontent.addEventListener('mousemove', (e) => {
-          if (e.buttons === 1) { // 마우스 왼쪽 버튼이 눌려있는 상태
-            isDragging = true;
-            // 성능 최적화: throttle 적용
-            if (mousemoveTimeout) return;
-            mousemoveTimeout = setTimeout(() => {
-              mousemoveTimeout = null;
-            }, 50);
-            // 드래그 중에는 플로팅 툴바 숨김
+          // .pcontent 영역에서 드래그 시 플로팅 툴바 비활성화
+          pcontent.addEventListener('mousedown', (e) => {
+            // 플로팅 툴바 숨김 (.pcontent 내부 선택은 inVerse()에서 이미 필터링됨)
             const floatingBar = document.getElementById('wbp-plbar');
             if (floatingBar) {
               floatingBar.hidden = true;
             }
-          }
-        });
-        
-        pcontent.addEventListener('mouseup', (e) => {
-          // 드래그 상태 해제
-          isDragging = false;
-        });
+          });
+        }
 
         parWrap.appendChild(detPara);
       });
