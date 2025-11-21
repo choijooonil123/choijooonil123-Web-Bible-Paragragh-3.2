@@ -1714,12 +1714,12 @@ function buildTree(){
         body.querySelector('.btnCommentary').addEventListener('click',()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('commentary'); }); // 주석 편집기 호출
         body.querySelector('.btnSummary').addEventListener('click',   ()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('summary'); }); // 내용흐름 편집기 호출
 
-        // 성경본문 영역 클릭 시 서식 버튼 영역 표시
+        // 성경본문 서식 버튼 영역 생성 (메시지요약 버튼 오른쪽에 배치)
         const formatToolbar = body.querySelector('.pcontent-format-toolbar');
         if (!formatToolbar) {
           const fmtToolbar = document.createElement('div');
           fmtToolbar.className = 'pcontent-format-toolbar';
-          fmtToolbar.style.display = 'none'; // 초기에는 숨김
+          fmtToolbar.style.display = 'none'; // 초기에는 숨김, .pcontent 클릭 시 표시
           fmtToolbar.innerHTML = `
             <button type="button" class="fmt-btn" data-cmd="bold" title="굵게 (Ctrl+B)"><b>B</b></button>
             <button type="button" class="fmt-btn" data-cmd="italic" title="기울임 (Ctrl+I)"><i>I</i></button>
@@ -1740,20 +1740,38 @@ function buildTree(){
             const btn = e.target.closest('button');
             if (!btn) return;
             
+            // pcontent에 포커스가 있는지 확인하고 없으면 포커스 설정
+            if (!pcontent.contains(document.activeElement)) {
+              pcontent.focus();
+            }
+            
             const cmd = btn.dataset.cmd;
             const color = btn.dataset.color;
             
             if (cmd) {
-              document.execCommand(cmd, false, null);
+              // execCommand 사용 (contenteditable 영역에서 작동)
+              const success = document.execCommand(cmd, false, null);
+              if (!success) {
+                console.warn(`execCommand ${cmd} 실패`);
+              }
             } else if (color) {
-              document.execCommand('foreColor', false, color);
+              // 색상 적용
+              const success = document.execCommand('foreColor', false, color);
+              if (!success) {
+                console.warn(`execCommand foreColor 실패`);
+              }
             }
+            
+            // 포커스를 pcontent로 유지
+            pcontent.focus();
           });
           
+          // 메시지요약 버튼 오른쪽에 배치
           const btnSummary = body.querySelector('.btnSummary');
           if (btnSummary) {
             btnSummary.insertAdjacentElement('afterend', fmtToolbar);
           } else {
+            // btnSummary가 없으면 ptoolbar 끝에 배치
             const ptoolbar = body.querySelector('.ptoolbar');
             if (ptoolbar) {
               ptoolbar.appendChild(fmtToolbar);
@@ -1780,6 +1798,16 @@ function buildTree(){
             });
             
             // 현재 단락의 서식 버튼 영역 표시
+            const fmtToolbar = body.querySelector('.pcontent-format-toolbar');
+            if (fmtToolbar) {
+              fmtToolbar.style.display = 'flex';
+              fmtToolbar.style.gap = '4px';
+              fmtToolbar.style.alignItems = 'center';
+            }
+          });
+          
+          // .pcontent 포커스 시에도 서식 버튼 표시
+          pcontent.addEventListener('focus', () => {
             const fmtToolbar = body.querySelector('.pcontent-format-toolbar');
             if (fmtToolbar) {
               fmtToolbar.style.display = 'flex';
