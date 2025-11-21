@@ -1679,6 +1679,10 @@ function buildTree(){
         const pcontent = body.querySelector('.pcontent');
         // 성경 본문 편집을 위해 contenteditable 설정
         pcontent.setAttribute('contenteditable', 'true');
+        // Grammarly 확장 프로그램 비활성화 (오류 방지)
+        pcontent.setAttribute('data-gramm', 'false');
+        pcontent.setAttribute('data-gramm_editor', 'false');
+        pcontent.setAttribute('data-enable-grammarly', 'false');
         (p.verses||[]).forEach(([v,t])=>{
           const line = document.createElement('div');
           line.className = 'pline';
@@ -1719,7 +1723,9 @@ function buildTree(){
         if (!formatToolbar) {
           const fmtToolbar = document.createElement('div');
           fmtToolbar.className = 'pcontent-format-toolbar';
-          fmtToolbar.style.display = 'none'; // 초기에는 숨김, .pcontent 클릭 시 표시
+          fmtToolbar.style.display = 'flex'; // 항상 표시
+          fmtToolbar.style.gap = '4px';
+          fmtToolbar.style.alignItems = 'center';
           fmtToolbar.innerHTML = `
             <button type="button" class="fmt-btn" data-cmd="bold" title="굵게 (Ctrl+B)"><b>B</b></button>
             <button type="button" class="fmt-btn" data-cmd="italic" title="기울임 (Ctrl+I)"><i>I</i></button>
@@ -1787,7 +1793,7 @@ function buildTree(){
           }
         }
         
-        // .pcontent 클릭 시 서식 버튼 영역 표시 (중복 등록 방지)
+        // .pcontent 클릭 시 서식 버튼 영역 강조 (중복 등록 방지)
         if (!pcontent.dataset.formatListenerAttached) {
           pcontent.dataset.formatListenerAttached = 'true';
           pcontent.addEventListener('click', (e) => {
@@ -1796,32 +1802,12 @@ function buildTree(){
               return;
             }
             
-            // 다른 단락의 서식 버튼 영역 숨김
-            document.querySelectorAll('.pcontent-format-toolbar').forEach(tb => {
-              const paraEl = tb.closest('details.para');
-              const currentParaEl = body.closest('details.para');
-              if (paraEl !== currentParaEl) {
-                tb.style.display = 'none';
-              }
-            });
-            
-            // 현재 단락의 서식 버튼 영역 표시
-            const fmtToolbar = body.querySelector('.pcontent-format-toolbar');
-            if (fmtToolbar) {
-              fmtToolbar.style.display = 'flex';
-              fmtToolbar.style.gap = '4px';
-              fmtToolbar.style.alignItems = 'center';
-            }
-          });
-          
-          // .pcontent 포커스 시에도 서식 버튼 표시 (무한 루프 방지)
-          pcontent.addEventListener('focus', (e) => {
-            // 포커스 이벤트는 한 번만 처리
+            // 현재 단락의 서식 버튼 영역이 표시되어 있는지 확인
             const fmtToolbar = body.querySelector('.pcontent-format-toolbar');
             if (fmtToolbar && fmtToolbar.style.display === 'none') {
               fmtToolbar.style.display = 'flex';
             }
-          }, { once: false, passive: true });
+          });
           
           // .pcontent 영역에서 드래그 시 플로팅 툴바 비활성화
           pcontent.addEventListener('mousedown', (e) => {
@@ -4029,7 +4015,7 @@ main { height:auto !important; overflow:visible !important; }
     <!-- 여기 뒤에 6색 팔레트 + 기타 드롭다운이 JS로 주입됩니다 -->
   </div>
 
-  <div id="editorRoot" class="rte" contenteditable="true" spellcheck="false" aria-label="Sermon Editor" style="min-height:360px;resize:vertical;padding:14px;background:#161922;border:1px solid #2a3040;border-radius:10px;line-height:1.85;letter-spacing:.015em;caret-color:var(--accent);outline:none"></div>
+  <div id="editorRoot" class="rte" contenteditable="true" spellcheck="false" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" aria-label="Sermon Editor" style="min-height:360px;resize:vertical;padding:14px;background:#161922;border:1px solid #2a3040;border-radius:10px;line-height:1.85;letter-spacing:.015em;caret-color:var(--accent);outline:none"></div>
 
   <div id="readPane" aria-label="Reading Sentences"></div>
 
