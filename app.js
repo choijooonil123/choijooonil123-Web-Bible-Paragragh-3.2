@@ -1740,30 +1740,38 @@ function buildTree(){
             const btn = e.target.closest('button');
             if (!btn) return;
             
-            // pcontent에 포커스가 있는지 확인하고 없으면 포커스 설정
-            if (!pcontent.contains(document.activeElement)) {
-              pcontent.focus();
-            }
-            
             const cmd = btn.dataset.cmd;
             const color = btn.dataset.color;
             
+            // 선택 영역이 있는지 확인
+            const sel = window.getSelection();
+            const hasSelection = sel && sel.rangeCount > 0 && !sel.isCollapsed;
+            
+            // 선택이 없으면 pcontent에 포커스 설정 (무한 루프 방지)
+            if (!hasSelection && !pcontent.contains(document.activeElement)) {
+              // 비동기로 포커스 설정하여 무한 루프 방지
+              setTimeout(() => {
+                if (!pcontent.contains(document.activeElement)) {
+                  pcontent.focus();
+                }
+              }, 0);
+            }
+            
             if (cmd) {
               // execCommand 사용 (contenteditable 영역에서 작동)
-              const success = document.execCommand(cmd, false, null);
-              if (!success) {
-                console.warn(`execCommand ${cmd} 실패`);
+              try {
+                document.execCommand(cmd, false, null);
+              } catch (e) {
+                console.warn(`execCommand ${cmd} 실패:`, e);
               }
             } else if (color) {
               // 색상 적용
-              const success = document.execCommand('foreColor', false, color);
-              if (!success) {
-                console.warn(`execCommand foreColor 실패`);
+              try {
+                document.execCommand('foreColor', false, color);
+              } catch (e) {
+                console.warn(`execCommand foreColor 실패:`, e);
               }
             }
-            
-            // 포커스를 pcontent로 유지
-            pcontent.focus();
           });
           
           // 메시지요약 버튼 오른쪽에 배치
@@ -1806,13 +1814,14 @@ function buildTree(){
             }
           });
           
-          // .pcontent 포커스 시에도 서식 버튼 표시
-          pcontent.addEventListener('focus', () => {
+          // .pcontent 포커스 시에도 서식 버튼 표시 (무한 루프 방지)
+          pcontent.addEventListener('focus', (e) => {
+            // 포커스 이벤트는 한 번만 처리
             const fmtToolbar = body.querySelector('.pcontent-format-toolbar');
-            if (fmtToolbar) {
+            if (fmtToolbar && fmtToolbar.style.display === 'none') {
               fmtToolbar.style.display = 'flex';
             }
-          });
+          }, { once: false, passive: true });
           
           // .pcontent 영역에서 드래그 시 플로팅 툴바 비활성화
           pcontent.addEventListener('mousedown', (e) => {
