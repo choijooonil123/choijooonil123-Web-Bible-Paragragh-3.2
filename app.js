@@ -2570,6 +2570,57 @@ function openSermonEditorDirectly(sermonIdx = 0){
     insertVerseBtn.style.display = 'none';
   }
   
+  // 플로팅 툴바 설정 (설교 편집기용)
+  setTimeout(() => {
+    const wbpPlbar = document.getElementById('wbp-plbar');
+    if (wbpPlbar && sermonBody && typeof createFloatingToolbar === 'function') {
+      // 7색 팔레트 주입 (이미 있으면 스킵)
+      (function injectPalette(){
+        if(wbpPlbar.querySelector('.wbp-colors')) return;
+        const PALETTE = ['#ff4d4f','#faad14','#fadb14','#52c41a','#1677ff','#722ed1','#ffffff'];
+        const wrap = document.createElement('div');
+        wrap.className = 'wbp-colors';
+        PALETTE.forEach(hex=>{
+          const b = document.createElement('button');
+          b.type='button'; 
+          b.title=hex === '#ffffff' ? '흰색' : hex; 
+          b.style.cssText=`width:22px;height:22px;border-radius:5px;border:1px solid ${hex === '#ffffff' ? '#666' : '#2a3040'};background:${hex};`;
+          b.addEventListener('click', ()=>{
+            document.execCommand?.('foreColor', false, hex);
+          });
+          wrap.appendChild(b);
+        });
+        wbpPlbar.appendChild(wrap);
+      })();
+
+      // selectionFilter: 설교 편집기 내부에서만 허용
+      function inSermonEditor() {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return false;
+        const c = sel.getRangeAt(0).commonAncestorContainer;
+        const el = (c.nodeType === 1 ? c : c.parentElement);
+        if (!el) return false;
+        // 설교 편집기 내부에 있는지 확인
+        return sermonBody.contains(el);
+      }
+
+      // 명령 핸들러
+      function handleCommand(cmd, val) {
+        document.execCommand(cmd, false, val);
+      }
+
+      createFloatingToolbar({
+        barElement: wbpPlbar,
+        colorElement: null,
+        rootContainer: sermonBody,
+        selectionFilter: inSermonEditor,
+        commandHandler: handleCommand,
+        windowObj: window,
+        docObj: document
+      });
+    }
+  }, 100);
+  
   // 모달이 열린 후 포커스를 모달 내부로 이동 (접근성 개선)
   setTimeout(() => {
     const firstFocusable = modalWrap.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
