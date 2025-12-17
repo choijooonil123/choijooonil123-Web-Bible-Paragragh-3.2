@@ -1073,6 +1073,9 @@ const STORAGE_BOOK_STRUCT  = 'WBP3_BOOK_STRUCT';
 const STORAGE_BOOK_SUMMARY = 'WBP3_BOOK_SUMMARY';
 const FMT_NS = 'WBP3_FMT';  // 서식 네임스페이스 (validateState에서 사용)
 
+// ===== [ElevenLabs TTS 설정] =====
+const ELEVENLABS_SETTINGS_KEY = 'wbps.elevenlabs.settings.v1';
+
 // ===== [통합 저장 시스템 v4] =====
 const STORAGE_VERSION = 4;
 const STORAGE_SCHEMA_PREFIX = 'wbps.v4';
@@ -1438,6 +1441,7 @@ let EDITOR_READER = { playing:false, u:null, synth:window.speechSynthesis||null 
   ensureSermonButtons();   // 🔧 설교 버튼 누락 시 보강
   status('불러오기 완료. 66권 트리가 활성화되었습니다.');
   await setupVoices();
+  initVoiceSettingsModal();  // 🎤 ElevenLabs 음성 설정 모달 초기화
   
   // 프로그램 시작 시 설교목록 자동 표시 비활성화 (설교목록 버튼을 눌러야 표시됨)
   // restoreSermonListOnStartup();
@@ -1579,6 +1583,700 @@ function speakSample(text){
   const u = new SpeechSynthesisUtterance(text);
   applyVoice(u);
   synth.speak(u);
+}
+
+/* --------- ElevenLabs TTS --------- */
+const ELEVENLABS = {
+  audioQueue: [],
+  isPlaying: false,
+  currentAudio: null,
+  abortController: null,
+  
+  // 설정 로드
+  getSettings() {
+    return loadState(ELEVENLABS_SETTINGS_KEY, {
+      engine: 'browser',
+      apiKey: '',
+      voiceId: '',
+      model: 'eleven_multilingual_v2',
+      stability: 0.5,
+      similarity: 0.75
+    });
+  },
+  
+  // 설정 저장
+  saveSettings(settings) {
+    saveState(ELEVENLABS_SETTINGS_KEY, settings);
+  },
+  
+  // ElevenLabs 사용 여부
+  isEnabled() {
+    const s = this.getSettings();
+    return s.engine === 'elevenlabs' && s.apiKey && s.voiceId;
+  },
+  
+  // 텍스트를 오디오로 변환 (ElevenLabs API 호출)
+  async textToSpeech(text) {
+    const s = this.getSettings();
+    if (!s.apiKey || !s.voiceId) {
+      throw new Error('ElevenLabs API 키와 Voice ID를 설정해주세요.');
+    }
+    
+    this.abortController = new AbortController();
+    
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${s.voiceId}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': s.apiKey
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: s.model,
+        voice_settings: {
+          stability: s.stability,
+          similarity_boost: s.similarity
+        }
+      }),
+      signal: this.abortController.signal
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail?.message || `API 오류: ${response.status}`);
+    }
+    
+    const audioBlob = await response.blob();
+    return URL.createObjectURL(audioBlob);
+  },
+  
+  // 단일 텍스트 재생
+  async speak(text, onStart, onEnd, onError) {
+    if (!text || !text.trim()) {
+      onEnd?.();
+      return;
+    }
+    
+    try {
+      onStart?.();
+      const audioUrl = await this.textToSpeech(text);
+      
+      return new Promise((resolve) => {
+        this.currentAudio = new Audio(audioUrl);
+        this.currentAudio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          this.currentAudio = null;
+          onEnd?.();
+          resolve();
+        };
+        this.currentAudio.onerror = (e) => {
+          URL.revokeObjectURL(audioUrl);
+          this.currentAudio = null;
+          onError?.(e);
+          resolve();
+        };
+        this.currentAudio.play().catch(e => {
+          onError?.(e);
+          resolve();
+        });
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        onEnd?.();
+        return;
+      }
+      onError?.(e);
+      throw e;
+    }
+  },
+  
+  // 문장 배열 순차 재생
+  async speakSentences(sentences, { onSentenceStart, onSentenceEnd, onAllEnd, onError }) {
+    this.isPlaying = true;
+    this.audioQueue = [...sentences];
+    
+    for (let i = 0; i < this.audioQueue.length; i++) {
+      if (!this.isPlaying) break;
+      
+      const sentence = this.audioQueue[i];
+      try {
+        await this.speak(
+          sentence,
+          () => onSentenceStart?.(i, sentence),
+          () => onSentenceEnd?.(i),
+          (e) => onError?.(e, i)
+        );
+      } catch (e) {
+        if (!this.isPlaying) break;
+        onError?.(e, i);
+      }
+    }
+    
+    this.isPlaying = false;
+    this.audioQueue = [];
+    onAllEnd?.();
+  },
+  
+  // 재생 중지
+  stop() {
+    this.isPlaying = false;
+    this.audioQueue = [];
+    
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+    
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.src = '';
+      this.currentAudio = null;
+    }
+  },
+  
+  // 일시정지
+  pause() {
+    if (this.currentAudio && !this.currentAudio.paused) {
+      this.currentAudio.pause();
+      return true;
+    }
+    return false;
+  },
+  
+  // 재개
+  resume() {
+    if (this.currentAudio && this.currentAudio.paused) {
+      this.currentAudio.play();
+      return true;
+    }
+    return false;
+  }
+};
+
+/* --------- Chatterbox TTS (무료 음성 복제) --------- */
+const CHATTERBOX = {
+  currentAudio: null,
+  abortController: null,
+  
+  // 설정 로드
+  getSettings() {
+    const s = loadState(ELEVENLABS_SETTINGS_KEY, {});
+    return {
+      url: s.chatterboxUrl || '',
+      voicePath: s.chatterboxVoicePath || '/content/audio.wav',
+      exaggeration: s.chatterboxExag ?? 0.5,
+      cfg: s.chatterboxCfg ?? 0.5
+    };
+  },
+  
+  // Chatterbox 사용 여부
+  isEnabled() {
+    const mainSettings = loadState(ELEVENLABS_SETTINGS_KEY, {});
+    const s = this.getSettings();
+    return mainSettings.engine === 'chatterbox' && s.url;
+  },
+  
+  // Gradio API를 통해 TTS 요청
+  async textToSpeech(text) {
+    const s = this.getSettings();
+    if (!s.url) {
+      throw new Error('Chatterbox Gradio URL을 설정해주세요.');
+    }
+    
+    this.abortController = new AbortController();
+    
+    // Gradio API 엔드포인트
+    const apiUrl = s.url.replace(/\/$/, '') + '/api/predict';
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        data: [
+          text,                    // 텍스트
+          s.voicePath,             // 음성 파일 경로
+          s.exaggeration,          // exaggeration
+          s.cfg,                   // cfg/pace
+          null                     // seed (random)
+        ]
+      }),
+      signal: this.abortController.signal
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Chatterbox API 오류: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    // Gradio 응답에서 오디오 URL 추출
+    if (result.data && result.data[0]) {
+      const audioData = result.data[0];
+      
+      // base64 데이터인 경우
+      if (typeof audioData === 'string' && audioData.startsWith('data:audio')) {
+        return audioData;
+      }
+      
+      // 파일 경로인 경우
+      if (typeof audioData === 'object' && audioData.name) {
+        return s.url.replace(/\/$/, '') + '/file=' + audioData.name;
+      }
+      
+      // URL인 경우
+      if (typeof audioData === 'string' && audioData.startsWith('http')) {
+        return audioData;
+      }
+    }
+    
+    throw new Error('Chatterbox 응답에서 오디오를 찾을 수 없습니다.');
+  },
+  
+  // 단일 텍스트 재생
+  async speak(text, onStart, onEnd, onError) {
+    if (!text || !text.trim()) {
+      onEnd?.();
+      return;
+    }
+    
+    try {
+      onStart?.();
+      const audioUrl = await this.textToSpeech(text);
+      
+      return new Promise((resolve) => {
+        this.currentAudio = new Audio(audioUrl);
+        this.currentAudio.onended = () => {
+          this.currentAudio = null;
+          onEnd?.();
+          resolve();
+        };
+        this.currentAudio.onerror = (e) => {
+          this.currentAudio = null;
+          onError?.(e);
+          resolve();
+        };
+        this.currentAudio.play().catch(e => {
+          onError?.(e);
+          resolve();
+        });
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        onEnd?.();
+        return;
+      }
+      onError?.(e);
+      throw e;
+    }
+  },
+  
+  // 문장 배열 순차 재생
+  async speakSentences(sentences, { onSentenceStart, onSentenceEnd, onAllEnd, onError }) {
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
+      try {
+        await this.speak(
+          sentence,
+          () => onSentenceStart?.(i, sentence),
+          () => onSentenceEnd?.(i),
+          (e) => onError?.(e, i)
+        );
+      } catch (e) {
+        onError?.(e, i);
+      }
+    }
+    onAllEnd?.();
+  },
+  
+  // 재생 중지
+  stop() {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+    
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.src = '';
+      this.currentAudio = null;
+    }
+  },
+  
+  // 일시정지
+  pause() {
+    if (this.currentAudio && !this.currentAudio.paused) {
+      this.currentAudio.pause();
+      return true;
+    }
+    return false;
+  },
+  
+  // 재개
+  resume() {
+    if (this.currentAudio && this.currentAudio.paused) {
+      this.currentAudio.play();
+      return true;
+    }
+    return false;
+  }
+};
+
+// 통합 음성 엔진 (ElevenLabs 또는 Chatterbox)
+function getActiveVoiceEngine() {
+  if (CHATTERBOX.isEnabled()) return CHATTERBOX;
+  if (ELEVENLABS.isEnabled()) return ELEVENLABS;
+  return null;
+}
+
+function isCustomVoiceEnabled() {
+  return CHATTERBOX.isEnabled() || ELEVENLABS.isEnabled();
+}
+
+// 음성 설정 UI 초기화
+function initVoiceSettingsModal() {
+  const btnOpen = el('btnVoiceSettings');
+  const modal = el('voiceSettingsModal');
+  const btnClose = el('closeVoiceSettings');
+  const btnSave = el('saveVoiceSettings');
+  const btnTest = el('testVoiceBtn');
+  const testStatus = el('voiceTestStatus');
+  
+  // 엔진 선택
+  const engineBrowser = el('voiceEngineBrowser');
+  const engineChatterbox = el('voiceEngineChatterbox');
+  const engineElevenLabs = el('voiceEngineElevenLabs');
+  
+  // 설정 패널
+  const chatterboxSettings = el('chatterboxSettings');
+  const elevenLabsSettings = el('elevenLabsSettings');
+  
+  // Chatterbox 입력
+  const chatterboxUrl = el('chatterboxUrl');
+  const chatterboxVoicePath = el('chatterboxVoicePath');
+  const chatterboxExag = el('chatterboxExag');
+  const chatterboxCfg = el('chatterboxCfg');
+  const chatterboxExagVal = el('chatterboxExagVal');
+  const chatterboxCfgVal = el('chatterboxCfgVal');
+  
+  // ElevenLabs 입력
+  const apiKeyInput = el('elevenLabsApiKey');
+  const voiceIdInput = el('elevenLabsVoiceId');
+  const modelSelect = el('elevenLabsModel');
+  const stabilityInput = el('elevenLabsStability');
+  const similarityInput = el('elevenLabsSimilarity');
+  const stabilityVal = el('stabilityVal');
+  const similarityVal = el('similarityVal');
+  
+  if (!modal || !btnOpen) return;
+  
+  // 모달 열기
+  btnOpen.onclick = () => {
+    loadSettingsToUI();
+    modal.style.display = 'flex';
+  };
+  
+  // 모달 닫기
+  btnClose.onclick = () => {
+    modal.style.display = 'none';
+  };
+  
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.style.display = 'none';
+  };
+  
+  // 엔진 선택 토글
+  const toggleSettingsUI = () => {
+    if (chatterboxSettings) {
+      chatterboxSettings.style.display = engineChatterbox?.checked ? 'block' : 'none';
+    }
+    if (elevenLabsSettings) {
+      elevenLabsSettings.style.display = engineElevenLabs?.checked ? 'block' : 'none';
+    }
+  };
+  
+  engineBrowser?.addEventListener('change', toggleSettingsUI);
+  engineChatterbox?.addEventListener('change', toggleSettingsUI);
+  engineElevenLabs?.addEventListener('change', toggleSettingsUI);
+  
+  // 슬라이더 값 표시 - Chatterbox
+  chatterboxExag?.addEventListener('input', () => {
+    if (chatterboxExagVal) chatterboxExagVal.textContent = chatterboxExag.value;
+  });
+  chatterboxCfg?.addEventListener('input', () => {
+    if (chatterboxCfgVal) chatterboxCfgVal.textContent = chatterboxCfg.value;
+  });
+  
+  // 슬라이더 값 표시 - ElevenLabs
+  stabilityInput?.addEventListener('input', () => {
+    if (stabilityVal) stabilityVal.textContent = stabilityInput.value;
+  });
+  similarityInput?.addEventListener('input', () => {
+    if (similarityVal) similarityVal.textContent = similarityInput.value;
+  });
+  
+  // 설정 로드
+  function loadSettingsToUI() {
+    const s = loadState(ELEVENLABS_SETTINGS_KEY, {});
+    
+    // 엔진 선택
+    if (s.engine === 'chatterbox') {
+      if (engineChatterbox) engineChatterbox.checked = true;
+    } else if (s.engine === 'elevenlabs') {
+      if (engineElevenLabs) engineElevenLabs.checked = true;
+    } else {
+      if (engineBrowser) engineBrowser.checked = true;
+    }
+    toggleSettingsUI();
+    
+    // Chatterbox 설정
+    if (chatterboxUrl) chatterboxUrl.value = s.chatterboxUrl || '';
+    if (chatterboxVoicePath) chatterboxVoicePath.value = s.chatterboxVoicePath || '/content/audio.wav';
+    if (chatterboxExag) {
+      chatterboxExag.value = s.chatterboxExag ?? 0.5;
+      if (chatterboxExagVal) chatterboxExagVal.textContent = chatterboxExag.value;
+    }
+    if (chatterboxCfg) {
+      chatterboxCfg.value = s.chatterboxCfg ?? 0.5;
+      if (chatterboxCfgVal) chatterboxCfgVal.textContent = chatterboxCfg.value;
+    }
+    
+    // ElevenLabs 설정
+    if (apiKeyInput) apiKeyInput.value = s.apiKey || '';
+    if (voiceIdInput) voiceIdInput.value = s.voiceId || '';
+    if (modelSelect) modelSelect.value = s.model || 'eleven_multilingual_v2';
+    if (stabilityInput) {
+      stabilityInput.value = s.stability ?? 0.5;
+      if (stabilityVal) stabilityVal.textContent = stabilityInput.value;
+    }
+    if (similarityInput) {
+      similarityInput.value = s.similarity ?? 0.75;
+      if (similarityVal) similarityVal.textContent = similarityInput.value;
+    }
+  }
+  
+  // 설정 저장
+  btnSave.onclick = () => {
+    let engine = 'browser';
+    if (engineChatterbox?.checked) engine = 'chatterbox';
+    else if (engineElevenLabs?.checked) engine = 'elevenlabs';
+    
+    const settings = {
+      engine: engine,
+      // Chatterbox
+      chatterboxUrl: chatterboxUrl?.value?.trim() || '',
+      chatterboxVoicePath: chatterboxVoicePath?.value?.trim() || '/content/audio.wav',
+      chatterboxExag: parseFloat(chatterboxExag?.value) || 0.5,
+      chatterboxCfg: parseFloat(chatterboxCfg?.value) || 0.5,
+      // ElevenLabs
+      apiKey: apiKeyInput?.value?.trim() || '',
+      voiceId: voiceIdInput?.value?.trim() || '',
+      model: modelSelect?.value || 'eleven_multilingual_v2',
+      stability: parseFloat(stabilityInput?.value) || 0.5,
+      similarity: parseFloat(similarityInput?.value) || 0.75
+    };
+    
+    saveState(ELEVENLABS_SETTINGS_KEY, settings);
+    alert('음성 설정이 저장되었습니다!');
+    modal.style.display = 'none';
+  };
+  
+  // 테스트 버튼
+  btnTest.onclick = async () => {
+    const testText = '태초에 하나님이 천지를 창조하시니라.';
+    
+    // Chatterbox 테스트
+    if (engineChatterbox?.checked) {
+      const url = chatterboxUrl?.value?.trim();
+      
+      if (!url) {
+        alert('Chatterbox Gradio URL을 입력해주세요.');
+        return;
+      }
+      
+      testStatus.textContent = '🔄 Chatterbox 연결 중...';
+      btnTest.disabled = true;
+      
+      try {
+        const apiUrl = url.replace(/\/$/, '') + '/api/predict';
+        
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            data: [
+              testText,
+              chatterboxVoicePath?.value || '/content/audio.wav',
+              parseFloat(chatterboxExag?.value) || 0.5,
+              parseFloat(chatterboxCfg?.value) || 0.5,
+              null
+            ]
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Chatterbox 오류: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        let audioUrl = null;
+        
+        if (result.data && result.data[0]) {
+          const audioData = result.data[0];
+          if (typeof audioData === 'string' && audioData.startsWith('data:audio')) {
+            audioUrl = audioData;
+          } else if (typeof audioData === 'object' && audioData.name) {
+            audioUrl = url.replace(/\/$/, '') + '/file=' + audioData.name;
+          } else if (typeof audioData === 'string' && audioData.startsWith('http')) {
+            audioUrl = audioData;
+          }
+        }
+        
+        if (!audioUrl) {
+          throw new Error('오디오 응답을 찾을 수 없습니다.');
+        }
+        
+        testStatus.textContent = '🔊 재생 중...';
+        const audio = new Audio(audioUrl);
+        
+        audio.onended = () => {
+          testStatus.textContent = '✅ Chatterbox 테스트 완료!';
+          btnTest.disabled = false;
+          setTimeout(() => { testStatus.textContent = ''; }, 3000);
+        };
+        
+        audio.onerror = () => {
+          testStatus.textContent = '❌ 재생 오류';
+          btnTest.disabled = false;
+        };
+        
+        audio.play();
+        
+      } catch (e) {
+        testStatus.textContent = '❌ ' + e.message;
+        btnTest.disabled = false;
+      }
+      return;
+    }
+    
+    // ElevenLabs 테스트
+    if (engineElevenLabs?.checked) {
+      const apiKey = apiKeyInput?.value?.trim();
+      const voiceId = voiceIdInput?.value?.trim();
+      
+      if (!apiKey || !voiceId) {
+        alert('API 키와 Voice ID를 입력해주세요.');
+        return;
+      }
+      
+      testStatus.textContent = '🔄 음성 생성 중...';
+      btnTest.disabled = true;
+      
+      try {
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': apiKey
+          },
+          body: JSON.stringify({
+            text: testText,
+            model_id: modelSelect?.value || 'eleven_multilingual_v2',
+            voice_settings: {
+              stability: parseFloat(stabilityInput?.value) || 0.5,
+              similarity_boost: parseFloat(similarityInput?.value) || 0.75
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.detail?.message || `API 오류: ${response.status}`);
+        }
+        
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        
+        testStatus.textContent = '🔊 재생 중...';
+        
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          testStatus.textContent = '✅ 테스트 완료!';
+          btnTest.disabled = false;
+          setTimeout(() => { testStatus.textContent = ''; }, 3000);
+        };
+        
+        audio.onerror = () => {
+          testStatus.textContent = '❌ 재생 오류';
+          btnTest.disabled = false;
+        };
+        
+        audio.play();
+        
+      } catch (e) {
+        testStatus.textContent = '❌ ' + e.message;
+        btnTest.disabled = false;
+      }
+    } else {
+      // 브라우저 TTS 테스트
+      testStatus.textContent = '🔊 재생 중...';
+      speakSample(testText);
+      setTimeout(() => { testStatus.textContent = ''; }, 2000);
+    }
+  };
+}
+
+// 통합 TTS 함수 - ElevenLabs 또는 브라우저 TTS 자동 선택
+async function universalSpeak(text, options = {}) {
+  const { onStart, onEnd, onError } = options;
+  
+  if (ELEVENLABS.isEnabled()) {
+    try {
+      await ELEVENLABS.speak(text, onStart, onEnd, onError);
+    } catch (e) {
+      onError?.(e);
+      // ElevenLabs 실패 시 브라우저 TTS로 폴백
+      console.warn('ElevenLabs 실패, 브라우저 TTS로 전환:', e.message);
+      return browserSpeak(text, options);
+    }
+  } else {
+    return browserSpeak(text, options);
+  }
+}
+
+// 브라우저 TTS 래퍼
+function browserSpeak(text, options = {}) {
+  const { onStart, onEnd, onError } = options;
+  const synth = window.speechSynthesis;
+  
+  return new Promise((resolve) => {
+    try { synth.cancel(); } catch(_) {}
+    
+    const u = new SpeechSynthesisUtterance(text);
+    applyVoice(u);
+    
+    u.onstart = () => onStart?.();
+    u.onend = () => { onEnd?.(); resolve(); };
+    u.onerror = (e) => { onError?.(e); resolve(); };
+    
+    synth.speak(u);
+  });
+}
+
+// 통합 TTS 중지
+function universalStop() {
+  // 커스텀 음성 중지
+  CHATTERBOX.stop();
+  ELEVENLABS.stop();
+  
+  // 브라우저 TTS 중지
+  try {
+    window.speechSynthesis?.cancel();
+  } catch(_) {}
 }
 
 /* --------- Tree --------- */
@@ -1723,107 +2421,6 @@ function buildTree(){
         body.querySelector('.btnWholeCtx').addEventListener('click',()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('whole'); }); // 전체성경속 편집기 호출
         body.querySelector('.btnCommentary').addEventListener('click',()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('commentary'); }); // 주석 편집기 호출
         body.querySelector('.btnSummary').addEventListener('click',   ()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('summary'); }); // 내용흐름 편집기 호출
-
-        // 성경본문 서식 버튼 영역 생성 (메시지요약 버튼 오른쪽에 배치)
-        const formatToolbar = body.querySelector('.pcontent-format-toolbar');
-        if (!formatToolbar) {
-          const fmtToolbar = document.createElement('div');
-          fmtToolbar.className = 'pcontent-format-toolbar';
-          fmtToolbar.style.display = 'flex'; // 항상 표시
-          fmtToolbar.style.gap = '4px';
-          fmtToolbar.style.alignItems = 'center';
-          fmtToolbar.innerHTML = `
-            <button type="button" class="fmt-btn" data-cmd="bold" title="굵게 (Ctrl+B)"><b>B</b></button>
-            <button type="button" class="fmt-btn" data-cmd="italic" title="기울임 (Ctrl+I)"><i>I</i></button>
-            <button type="button" class="fmt-btn" data-cmd="underline" title="밑줄 (Ctrl+U)"><u>U</u></button>
-            <div class="fmt-color-palette">
-              <button type="button" class="fmt-color-btn" data-color="#ff4d4f" title="빨강" style="background:#ff4d4f;width:20px;height:20px;border-radius:4px;border:1px solid #2a3040;"></button>
-              <button type="button" class="fmt-color-btn" data-color="#fadb14" title="노랑" style="background:#fadb14;width:20px;height:20px;border-radius:4px;border:1px solid #2a3040;"></button>
-              <button type="button" class="fmt-color-btn" data-color="#52c41a" title="초록" style="background:#52c41a;width:20px;height:20px;border-radius:4px;border:1px solid #2a3040;"></button>
-              <button type="button" class="fmt-color-btn" data-color="#1677ff" title="파랑" style="background:#1677ff;width:20px;height:20px;border-radius:4px;border:1px solid #2a3040;"></button>
-              <button type="button" class="fmt-color-btn" data-color="#722ed1" title="보라" style="background:#722ed1;width:20px;height:20px;border-radius:4px;border:1px solid #2a3040;"></button>
-              <button type="button" class="fmt-color-btn" data-color="#ffffff" title="흰색" style="background:#ffffff;width:20px;height:20px;border-radius:4px;border:1px solid #666;"></button>
-            </div>
-          `;
-          
-          // 서식 버튼 클릭 이벤트
-          fmtToolbar.addEventListener('click', (e) => {
-            e.stopPropagation(); // 이벤트 전파 방지
-            const btn = e.target.closest('button');
-            if (!btn) return;
-            
-            const cmd = btn.dataset.cmd;
-            const color = btn.dataset.color;
-            
-            // 선택 영역이 있는지 확인
-            const sel = window.getSelection();
-            const hasSelection = sel && sel.rangeCount > 0 && !sel.isCollapsed;
-            
-            // 선택이 없으면 pcontent에 포커스 설정 (무한 루프 방지)
-            if (!hasSelection && !pcontent.contains(document.activeElement)) {
-              // 비동기로 포커스 설정하여 무한 루프 방지
-              setTimeout(() => {
-                if (!pcontent.contains(document.activeElement)) {
-                  pcontent.focus();
-                }
-              }, 0);
-            }
-            
-            if (cmd) {
-              // execCommand 사용 (contenteditable 영역에서 작동)
-              try {
-                document.execCommand(cmd, false, null);
-              } catch (e) {
-                console.warn(`execCommand ${cmd} 실패:`, e);
-              }
-            } else if (color) {
-              // 색상 적용
-              try {
-                document.execCommand('foreColor', false, color);
-              } catch (e) {
-                console.warn(`execCommand foreColor 실패:`, e);
-              }
-            }
-          });
-          
-          // 메시지요약 버튼 오른쪽에 배치
-          const btnSummary = body.querySelector('.btnSummary');
-          if (btnSummary) {
-            btnSummary.insertAdjacentElement('afterend', fmtToolbar);
-          } else {
-            // btnSummary가 없으면 ptoolbar 끝에 배치
-            const ptoolbar = body.querySelector('.ptoolbar');
-            if (ptoolbar) {
-              ptoolbar.appendChild(fmtToolbar);
-            }
-          }
-        }
-        
-        // .pcontent 클릭 시 서식 버튼 영역 강조 (중복 등록 방지)
-        if (!pcontent.dataset.formatListenerAttached) {
-          pcontent.dataset.formatListenerAttached = 'true';
-          pcontent.addEventListener('click', (e) => {
-            // 서식 버튼 영역 클릭은 무시
-            if (e.target.closest('.pcontent-format-toolbar')) {
-              return;
-            }
-            
-            // 현재 단락의 서식 버튼 영역이 표시되어 있는지 확인
-            const fmtToolbar = body.querySelector('.pcontent-format-toolbar');
-            if (fmtToolbar && fmtToolbar.style.display === 'none') {
-              fmtToolbar.style.display = 'flex';
-            }
-          });
-          
-          // .pcontent 영역에서 드래그 시 플로팅 툴바 비활성화
-          pcontent.addEventListener('mousedown', (e) => {
-            // 플로팅 툴바 숨김 (.pcontent 내부 선택은 inVerse()에서 이미 필터링됨)
-            const floatingBar = document.getElementById('wbp-plbar');
-            if (floatingBar) {
-              floatingBar.hidden = true;
-            }
-          });
-        }
 
         parWrap.appendChild(detPara);
       });
@@ -2130,11 +2727,86 @@ function highlightSentenceInLine(line, sentenceIndex, sentences) {
 }
 
 function speakVerseItemInScope(item, scope, onend){
-  if(!READER.synth) return;
+  // 커스텀 음성 사용 여부 확인
+  const useCustomVoice = isCustomVoiceEnabled();
+  const voiceEngine = getActiveVoiceEngine();
+  
+  if(!useCustomVoice && !READER.synth) {
+    READER.synth = window.speechSynthesis || null;
+    if(!READER.synth) return;
+  }
   
   // 절 텍스트를 문장으로 분할
   const sentences = splitToSentences(item.text);
   const line = scope.querySelector(`.pline[data-verse="${item.verse}"]`);
+  
+  // 커스텀 음성(Chatterbox/ElevenLabs)으로 낭독
+  if (useCustomVoice && voiceEngine) {
+    clearReadingHighlight(scope);
+    if(line){ 
+      line.classList.add('reading'); 
+      line.scrollIntoView({block:'center', behavior:'smooth'}); 
+    }
+    
+    if (sentences.length === 0) {
+      // 문장이 없으면 전체 텍스트 읽기
+      voiceEngine.speak(
+        String(item.text),
+        () => status('🎤 내 음성으로 낭독 중...'),
+        () => onend(),
+        (e) => {
+          console.error('커스텀 음성 오류:', e);
+          // 오류 시 브라우저 TTS로 폴백
+          speakVerseWithBrowserTTS(item, scope, line, onend);
+        }
+      );
+    } else {
+      // 문장 단위로 읽기
+      let currentIdx = 0;
+      
+      async function speakNextWithCustomVoice() {
+        if (!READER.playing || currentIdx >= sentences.length) {
+          onend();
+          return;
+        }
+        
+        const sentence = sentences[currentIdx];
+        if (line) {
+          highlightSentenceInLine(line, currentIdx, sentences);
+        }
+        
+        try {
+          await voiceEngine.speak(
+            sentence,
+            () => {},
+            () => {
+              currentIdx++;
+              speakNextWithCustomVoice();
+            },
+            (e) => {
+              console.error('커스텀 음성 문장 오류:', e);
+              currentIdx++;
+              speakNextWithCustomVoice();
+            }
+          );
+        } catch (e) {
+          currentIdx++;
+          speakNextWithCustomVoice();
+        }
+      }
+      
+      speakNextWithCustomVoice();
+    }
+    return;
+  }
+  
+  // 브라우저 TTS로 낭독
+  speakVerseWithBrowserTTS(item, scope, line, onend);
+}
+
+// 브라우저 TTS로 절 낭독 (폴백용)
+function speakVerseWithBrowserTTS(item, scope, line, onend) {
+  const sentences = splitToSentences(item.text);
   
   if (sentences.length === 0) {
     // 문장이 없으면 기존 방식대로 처리
@@ -2246,6 +2918,12 @@ function playNextInQueueInline(book, chap, idx){
 }
 function stopSpeakInline(){
   READER.playing = false;
+  
+  // 커스텀 음성 중지
+  CHATTERBOX.stop();
+  ELEVENLABS.stop();
+  
+  // 브라우저 TTS 중지
   try{ READER.synth && READER.synth.cancel(); }catch(e){}
   if (READER._wd){ clearTimeout(READER._wd); READER._wd = null; }
   if(READER.scope){
@@ -3705,8 +4383,10 @@ let EDITOR_TTS = {
   sents: [],
   idx: 0,
   playing: false,
+  paused: false,
   synth: window.speechSynthesis || null,
-  utter: null
+  utter: null,
+  useCustomVoice: false
 };
 
 // HTML을 일반 텍스트로 변환
@@ -3727,28 +4407,44 @@ function splitToSentences(text) {
 }
 
 function toggleEditorSpeak(){
-  // speechSynthesis가 없으면 재시도
-  if(!EDITOR_TTS.synth) {
-    EDITOR_TTS.synth = window.speechSynthesis || null;
-    if(!EDITOR_TTS.synth) return alert('이 브라우저는 음성합성을 지원하지 않습니다.');
-  }
+  // 커스텀 음성 사용 여부 확인
+  EDITOR_TTS.useCustomVoice = isCustomVoiceEnabled();
+  const voiceEngine = getActiveVoiceEngine();
   
-  // 재생 중인 경우 일시정지/재개 처리
+  // 재생 중인 경우 일시정지/재개/중지 처리
   if(EDITOR_TTS.playing) {
-    if(EDITOR_TTS.synth.speaking && !EDITOR_TTS.synth.paused) {
-      // 일시정지
-      EDITOR_TTS.synth.pause();
-      editorSpeakBtn.textContent = '재개';
-      return;
-    } else if(EDITOR_TTS.synth.paused) {
-      // 재개
-      EDITOR_TTS.synth.resume();
-      editorSpeakBtn.textContent = '일시정지';
-      return;
+    if (EDITOR_TTS.useCustomVoice && voiceEngine) {
+      // 커스텀 음성(Chatterbox/ElevenLabs) 일시정지/재개
+      if (!EDITOR_TTS.paused) {
+        if (voiceEngine.pause()) {
+          EDITOR_TTS.paused = true;
+          editorSpeakBtn.textContent = '재개';
+        }
+        return;
+      } else {
+        if (voiceEngine.resume()) {
+          EDITOR_TTS.paused = false;
+          editorSpeakBtn.textContent = '일시정지';
+        }
+        return;
+      }
     } else {
-      // 재생 중이지만 speaking이 false인 경우 중지
-      stopEditorSpeak();
-      return;
+      // 브라우저 TTS 일시정지/재개
+      if(!EDITOR_TTS.synth) {
+        EDITOR_TTS.synth = window.speechSynthesis || null;
+      }
+      if(EDITOR_TTS.synth?.speaking && !EDITOR_TTS.synth?.paused) {
+        EDITOR_TTS.synth.pause();
+        editorSpeakBtn.textContent = '재개';
+        return;
+      } else if(EDITOR_TTS.synth?.paused) {
+        EDITOR_TTS.synth.resume();
+        editorSpeakBtn.textContent = '일시정지';
+        return;
+      } else {
+        stopEditorSpeak();
+        return;
+      }
     }
   }
 
@@ -3772,13 +4468,53 @@ function toggleEditorSpeak(){
 
   EDITOR_TTS.idx = 0;
   EDITOR_TTS.playing = true;
+  EDITOR_TTS.paused = false;
   editorSpeakBtn.textContent = '일시정지';
   
-  // 첫 문장부터 시작
-  speakEditorSentence(0);
+  // 커스텀 음성 또는 브라우저 TTS로 시작
+  if (EDITOR_TTS.useCustomVoice) {
+    speakEditorWithCustomVoice();
+  } else {
+    speakEditorSentence(0);
+  }
 }
 
+// 커스텀 음성(Chatterbox/ElevenLabs)으로 에디터 낭독
+async function speakEditorWithCustomVoice() {
+  const voiceEngine = getActiveVoiceEngine();
+  if (!voiceEngine) {
+    speakEditorSentence(0);
+    return;
+  }
+  
+  await voiceEngine.speakSentences(EDITOR_TTS.sents, {
+    onSentenceStart: (i, sentence) => {
+      EDITOR_TTS.idx = i;
+      status(`🎤 내 음성으로 낭독 중... (${i+1}/${EDITOR_TTS.sents.length})`);
+    },
+    onSentenceEnd: (i) => {
+      // 문장 끝
+    },
+    onAllEnd: () => {
+      stopEditorSpeak(true);
+    },
+    onError: (e, i) => {
+      console.error('커스텀 음성 낭독 오류:', e);
+      // 오류 발생 시 브라우저 TTS로 폴백
+      if (EDITOR_TTS.playing && i !== undefined) {
+        status('⚠️ 음성 엔진 오류, 브라우저 TTS로 전환...');
+        EDITOR_TTS.useCustomVoice = false;
+        speakEditorSentence(i);
+      }
+    }
+  });
+}
+
+// 브라우저 TTS로 문장 낭독
 function speakEditorSentence(i) {
+  if (!EDITOR_TTS.synth) {
+    EDITOR_TTS.synth = window.speechSynthesis || null;
+  }
   if (!EDITOR_TTS.synth || !EDITOR_TTS.playing) return;
   if (i < 0 || i >= EDITOR_TTS.sents.length) {
     stopEditorSpeak(true);
@@ -3820,6 +4556,13 @@ function speakEditorSentence(i) {
 
 function stopEditorSpeak(silent){
   EDITOR_TTS.playing = false;
+  EDITOR_TTS.paused = false;
+  
+  // 커스텀 음성 중지
+  CHATTERBOX.stop();
+  ELEVENLABS.stop();
+  
+  // 브라우저 TTS 중지
   if(EDITOR_TTS.synth){ 
     try{ 
       EDITOR_TTS.synth.cancel();
@@ -5537,22 +6280,40 @@ function createFloatingToolbar(options) {
     const startInPcontent = isInPcontent(startContainer);
     const endInPcontent = isInPcontent(endContainer);
     if (startInPcontent || endInPcontent) {
-      // .pcontent 내부 선택은 플로팅 툴바를 표시하지 않음 (서식 버튼 영역 사용)
+      // .pline 내부 선택은 플로팅 툴바를 허용 (글자색 적용 가능)
+      const startPline = startContainer.nodeType === 3 
+        ? startContainer.parentElement?.closest('.pline')
+        : startContainer.closest?.('.pline');
+      const endPline = endContainer.nodeType === 3
+        ? endContainer.parentElement?.closest('.pline')
+        : endContainer.closest?.('.pline');
+      
+      // .pline 내부 선택이면 플로팅 툴바 허용
+      if (startPline || endPline) {
+        if (DEBUG) {
+          addDebugLog(`✅ .pline 내부 선택은 플로팅 툴바 허용`, 'success');
+        }
+        const elapsed = (performance.now() - startTime).toFixed(2);
+        if (DEBUG) addDebugLog(`⏱️ 처리 시간: ${elapsed}ms`, 'info');
+        return true; // .pline 내부 선택은 플로팅 툴바 표시
+      }
+      
+      // .pline 외부의 .pcontent 선택은 플로팅 툴바 비활성화
       const startPcontent = startContainer.nodeType === 3 
         ? startContainer.parentElement?.closest('.pcontent')
-        : startContainer.closest('.pcontent');
+        : startContainer.closest?.('.pcontent');
       const endPcontent = endContainer.nodeType === 3
         ? endContainer.parentElement?.closest('.pcontent')
-        : endContainer.closest('.pcontent');
+        : endContainer.closest?.('.pcontent');
       
       if (startPcontent || endPcontent) {
         if (DEBUG) {
-          addDebugLog(`❌ .pcontent 내부 선택은 플로팅 툴바 비활성화`, 'info');
+          addDebugLog(`❌ .pcontent 직접 선택 (pline 아님)은 플로팅 툴바 비활성화`, 'info');
         }
-        return false; // .pcontent 내부 선택은 플로팅 툴바 표시 안 함
+        return false;
       }
       
-      // .pcontent가 아닌 다른 영역(.pline 등)은 허용
+      // 기타 영역은 허용
       if (DEBUG) {
         const info = {
           startInPcontent,
@@ -5560,8 +6321,8 @@ function createFloatingToolbar(options) {
           startContainer: startContainer.nodeType === 3 ? startContainer.textContent?.substring(0, 20) : startContainer.tagName,
           endContainer: endContainer.nodeType === 3 ? endContainer.textContent?.substring(0, 20) : endContainer.tagName
         };
-        console.log('[inVerse] ✅ .pcontent 외부 선택 허용', info);
-        addDebugLog(`✅ .pcontent 외부 선택 허용 (start: ${startInPcontent}, end: ${endInPcontent})`, 'success');
+        console.log('[inVerse] ✅ 기타 영역 선택 허용', info);
+        addDebugLog(`✅ 기타 영역 선택 허용 (start: ${startInPcontent}, end: ${endInPcontent})`, 'success');
       }
       const elapsed = (performance.now() - startTime).toFixed(2);
       if (DEBUG) addDebugLog(`⏱️ 처리 시간: ${elapsed}ms`, 'info');
