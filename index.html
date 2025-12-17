@@ -368,6 +368,9 @@
 
   </style>
 
+  <!-- 🚀 폰트 최적화: preconnect로 DNS/TLS 미리 연결 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&family=Nanum+Myeongjo&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -571,6 +574,147 @@
     <div class="divider"></div>
     <!-- 여기 뒤에 7색 팔레트가 JS로 주입됩니다 -->
   </div>
+
+  <!-- 🚀 JSON 캐싱 시스템 (IndexedDB) - 재방문 시 즉시 로딩 -->
+  <script>
+  (function setupBibleCache() {
+    const DB_NAME = 'WBP_BibleCache';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'bibleData';
+    const CACHE_KEY = 'bible-paragraphs';
+    const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7일
+
+    // IndexedDB 열기
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'key' });
+          }
+        };
+      });
+    }
+
+    // 캐시에서 읽기
+    async function getFromCache(key) {
+      try {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.get(key);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      } catch (e) {
+        console.warn('[BibleCache] IndexedDB not available:', e);
+        return null;
+      }
+    }
+
+    // 캐시에 저장
+    async function saveToCache(key, data) {
+      try {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.put({
+            key,
+            data,
+            timestamp: Date.now()
+          });
+          request.onsuccess = () => resolve(true);
+          request.onerror = () => reject(request.error);
+        });
+      } catch (e) {
+        console.warn('[BibleCache] Failed to save:', e);
+        return false;
+      }
+    }
+
+    // 캐시 유효성 검사
+    function isCacheValid(cached) {
+      if (!cached || !cached.data || !cached.timestamp) return false;
+      return (Date.now() - cached.timestamp) < CACHE_DURATION;
+    }
+
+    // 전역 함수로 노출 - app.js에서 사용
+    window.__WBP_BIBLE_CACHE__ = {
+      async loadBible() {
+        const startTime = performance.now();
+        
+        // 1) 캐시 확인
+        const cached = await getFromCache(CACHE_KEY);
+        if (isCacheValid(cached)) {
+          const loadTime = (performance.now() - startTime).toFixed(0);
+          console.log(`[BibleCache] ✅ 캐시에서 로드됨 (${loadTime}ms)`);
+          return cached.data;
+        }
+
+        // 2) 네트워크에서 fetch
+        console.log('[BibleCache] 🌐 네트워크에서 다운로드 중...');
+        let data = null;
+        try {
+          const res = await fetch('bible-paragraphs.json', { cache: 'no-store' });
+          if (res.ok) data = await res.json();
+        } catch (_) {}
+        
+        if (!data) {
+          try {
+            const res = await fetch('bible_paragraphs.json', { cache: 'no-store' });
+            if (res.ok) data = await res.json();
+          } catch (_) {}
+        }
+
+        if (!data) {
+          throw new Error('bible-paragraphs.json을 찾을 수 없습니다.');
+        }
+
+        // 3) 캐시에 저장 (백그라운드)
+        saveToCache(CACHE_KEY, data).then(() => {
+          const loadTime = (performance.now() - startTime).toFixed(0);
+          console.log(`[BibleCache] 💾 캐시에 저장됨 (총 ${loadTime}ms)`);
+        });
+
+        return data;
+      },
+
+      // 캐시 강제 새로고침
+      async refreshCache() {
+        try {
+          const res = await fetch('bible-paragraphs.json', { cache: 'no-store' });
+          if (!res.ok) throw new Error('Fetch failed');
+          const data = await res.json();
+          await saveToCache(CACHE_KEY, data);
+          console.log('[BibleCache] 🔄 캐시 갱신 완료');
+          return data;
+        } catch (e) {
+          console.error('[BibleCache] 캐시 갱신 실패:', e);
+          return null;
+        }
+      },
+
+      // 캐시 삭제
+      async clearCache() {
+        try {
+          const db = await openDB();
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).delete(CACHE_KEY);
+          console.log('[BibleCache] 🗑️ 캐시 삭제됨');
+        } catch (e) {
+          console.error('[BibleCache] 캐시 삭제 실패:', e);
+        }
+      }
+    };
+
+    console.log('[BibleCache] 🚀 캐싱 시스템 초기화 완료');
+  })();
+  </script>
 
   <!-- 앱 본체 -->
   <script src="app.js" defer></script>

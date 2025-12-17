@@ -4,17 +4,11 @@
 
 function ensureBookHeadChips(){
   const doc = document;
-  const tree = doc.getElementById('tree');
-  
-  // 트리가 없거나 비어있으면 조용히 반환 (트리 렌더링 전일 수 있음)
-  if (!tree || !tree.children.length) {
-    return;
-  }
 
   // 1) 책 노드 찾기
   const books = doc.querySelectorAll('#tree > details, details.book');
   if (!books.length) {
-    // 트리가 있지만 책이 없을 때만 경고 (트리 렌더링 중일 수 있음)
+    console.warn('[bookchips] 책(details) 없음: #tree 구조를 확인하세요.');
     return;
   }
 
@@ -219,7 +213,42 @@ function _bookKeyFromSummary(sumEl, type){
   return `${BOOK_UNIT_NS}:${bookId}:${type}`;
 }
 
-// _ensureBookUnitEditorHost는 _ensureUnitEditorHost와 통합됨 (379줄 참조)
+// 기존 단위 에디터 팝업을 재사용 (없으면 생성)
+function _ensureBookUnitEditorHost(){
+  let host = document.getElementById('unitEditor');
+  if (host) return host;
+  host = document.createElement('div');
+  host.id = 'unitEditor';
+  host.className = 'unit-editor';
+  host.innerHTML = `
+    <header>
+      <div class="ue-title">단위 에디터</div>
+      <div class="ue-actions">
+        <button type="button" id="ueSave">저장</button>
+        <button type="button" id="ueClose">닫기</button>
+      </div>
+    </header>
+    <textarea id="ueText" placeholder="여기에 내용을 입력하세요. (자동저장)"></textarea>
+  `;
+  document.body.appendChild(host);
+  // 닫기
+  host.querySelector('#ueClose').addEventListener('click', ()=> { host.style.display = 'none'; });
+  // 수동 저장
+  host.querySelector('#ueSave').addEventListener('click', ()=>{
+    const key = host.dataset.key;
+    if (key) saveState(key, host.querySelector('#ueText').value || '');
+  });
+  // 자동 저장(디바운스)
+  let _tm = null;
+  host.querySelector('#ueText').addEventListener('input', ()=>{
+    clearTimeout(_tm);
+    _tm = setTimeout(()=>{
+      const key = host.dataset.key;
+      if (key) debounceSave(key, host.querySelector('#ueText').value || '', 400);
+    }, 400);
+  });
+  return host;
+}
 
 // 책 단위 에디터 열기
 function openBookEditor(type, sumEl){
@@ -229,7 +258,7 @@ function openBookEditor(type, sumEl){
   const key = _bookKeyFromSummary(sum, type);
   if (!key) { alert('책 키 생성 실패: .btitle data-book 또는 텍스트 확인'); return; }
 
-  const host = _ensureUnitEditorHost();  // 통합된 함수 사용
+  const host = _ensureBookUnitEditorHost();
   const label = (type === 'basic') ? '기본이해' : (type === 'structure' ? '내용구조' : '메세지요약');
   host.dataset.key = key;
   host.querySelector('.ue-title').textContent = `단위 에디터 — ${label} (책 단위)`;
@@ -398,7 +427,7 @@ function openUnitEditor(type){
 }
 
 // ===== [FORMAT-PERSIST BACKUP] 내보내기/가져오기 유틸 (WBP3_FMT) BEGIN =====
-const FMT_NS = 'WBP3_FMT';  // 서식 네임스페이스
+// const FMT_NS = typeof FMT_NS === 'string' ? FMT_NS : 'WBP3_FMT'; // 이미 있으면 재사용
 
 function wbpExportFormats(){
   try{
@@ -1036,10 +1065,7 @@ const VOICE_CHOICE_KEY    = 'wbps.tts.choice.v2';
 const STORAGE_BOOK_BASIC   = 'WBP3_BOOK_BASIC';
 const STORAGE_BOOK_STRUCT  = 'WBP3_BOOK_STRUCT';
 const STORAGE_BOOK_SUMMARY = 'WBP3_BOOK_SUMMARY';
-// FMT_NS는 435줄 부근에서 정의됨 (wbpExportFormats 함수 앞)
-
-// ===== [ElevenLabs TTS 설정] =====
-const ELEVENLABS_SETTINGS_KEY = 'wbps.elevenlabs.settings.v1';
+const FMT_NS = 'WBP3_FMT';  // 서식 네임스페이스 (validateState에서 사용)
 
 // ===== [통합 저장 시스템 v4] =====
 const STORAGE_VERSION = 4;
@@ -1396,17 +1422,34 @@ let EDITOR_READER = { playing:false, u:null, synth:window.speechSynthesis||null 
 
 /* --------- Boot --------- */
 (async function boot(){
-  try{
-    BIBLE = await tryFetchJSON('bible-paragraphs.json');
-  }catch(_){
-    try{ BIBLE = await tryFetchJSON('bible_paragraphs.json'); }
-    catch(e){ status('bible-paragraphs.json을 찾을 수 없습니다. 같은 폴더에 두고 다시 열어주세요.'); return; }
+  const startTime = performance.now();
+  
+  try {
+    // 🚀 IndexedDB 캐싱 시스템 사용 (재방문 시 즉시 로딩!)
+    if (window.__WBP_BIBLE_CACHE__?.loadBible) {
+      BIBLE = await window.__WBP_BIBLE_CACHE__.loadBible();
+    } else {
+      // fallback: 캐싱 시스템이 없으면 직접 fetch
+      try {
+        BIBLE = await tryFetchJSON('bible-paragraphs.json');
+      } catch(_) {
+        BIBLE = await tryFetchJSON('bible_paragraphs.json');
+      }
+    }
+  } catch(e) {
+    status('bible-paragraphs.json을 찾을 수 없습니다. 같은 폴더에 두고 다시 열어주세요.');
+    console.error('[Boot] 성경 데이터 로드 실패:', e);
+    return;
   }
+  
   buildTree();
   ensureSermonButtons();   // 🔧 설교 버튼 누락 시 보강
-  status('불러오기 완료. 66권 트리가 활성화되었습니다.');
+  
+  const loadTime = (performance.now() - startTime).toFixed(0);
+  status(`불러오기 완료 (${loadTime}ms). 66권 트리가 활성화되었습니다.`);
+  console.log(`[Boot] ✅ 전체 초기화 완료: ${loadTime}ms`);
+  
   await setupVoices();
-  initVoiceSettingsModal();  // 🎤 ElevenLabs 음성 설정 모달 초기화
   
   // 프로그램 시작 시 설교목록 자동 표시 비활성화 (설교목록 버튼을 눌러야 표시됨)
   // restoreSermonListOnStartup();
@@ -1550,700 +1593,6 @@ function speakSample(text){
   synth.speak(u);
 }
 
-/* --------- ElevenLabs TTS --------- */
-const ELEVENLABS = {
-  audioQueue: [],
-  isPlaying: false,
-  currentAudio: null,
-  abortController: null,
-  
-  // 설정 로드
-  getSettings() {
-    return loadState(ELEVENLABS_SETTINGS_KEY, {
-      engine: 'browser',
-      apiKey: '',
-      voiceId: '',
-      model: 'eleven_multilingual_v2',
-      stability: 0.5,
-      similarity: 0.75
-    });
-  },
-  
-  // 설정 저장
-  saveSettings(settings) {
-    saveState(ELEVENLABS_SETTINGS_KEY, settings);
-  },
-  
-  // ElevenLabs 사용 여부
-  isEnabled() {
-    const s = this.getSettings();
-    return s.engine === 'elevenlabs' && s.apiKey && s.voiceId;
-  },
-  
-  // 텍스트를 오디오로 변환 (ElevenLabs API 호출)
-  async textToSpeech(text) {
-    const s = this.getSettings();
-    if (!s.apiKey || !s.voiceId) {
-      throw new Error('ElevenLabs API 키와 Voice ID를 설정해주세요.');
-    }
-    
-    this.abortController = new AbortController();
-    
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${s.voiceId}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': s.apiKey
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: s.model,
-        voice_settings: {
-          stability: s.stability,
-          similarity_boost: s.similarity
-        }
-      }),
-      signal: this.abortController.signal
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail?.message || `API 오류: ${response.status}`);
-    }
-    
-    const audioBlob = await response.blob();
-    return URL.createObjectURL(audioBlob);
-  },
-  
-  // 단일 텍스트 재생
-  async speak(text, onStart, onEnd, onError) {
-    if (!text || !text.trim()) {
-      onEnd?.();
-      return;
-    }
-    
-    try {
-      onStart?.();
-      const audioUrl = await this.textToSpeech(text);
-      
-      return new Promise((resolve) => {
-        this.currentAudio = new Audio(audioUrl);
-        this.currentAudio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          this.currentAudio = null;
-          onEnd?.();
-          resolve();
-        };
-        this.currentAudio.onerror = (e) => {
-          URL.revokeObjectURL(audioUrl);
-          this.currentAudio = null;
-          onError?.(e);
-          resolve();
-        };
-        this.currentAudio.play().catch(e => {
-          onError?.(e);
-          resolve();
-        });
-      });
-    } catch (e) {
-      if (e.name === 'AbortError') {
-        onEnd?.();
-        return;
-      }
-      onError?.(e);
-      throw e;
-    }
-  },
-  
-  // 문장 배열 순차 재생
-  async speakSentences(sentences, { onSentenceStart, onSentenceEnd, onAllEnd, onError }) {
-    this.isPlaying = true;
-    this.audioQueue = [...sentences];
-    
-    for (let i = 0; i < this.audioQueue.length; i++) {
-      if (!this.isPlaying) break;
-      
-      const sentence = this.audioQueue[i];
-      try {
-        await this.speak(
-          sentence,
-          () => onSentenceStart?.(i, sentence),
-          () => onSentenceEnd?.(i),
-          (e) => onError?.(e, i)
-        );
-      } catch (e) {
-        if (!this.isPlaying) break;
-        onError?.(e, i);
-      }
-    }
-    
-    this.isPlaying = false;
-    this.audioQueue = [];
-    onAllEnd?.();
-  },
-  
-  // 재생 중지
-  stop() {
-    this.isPlaying = false;
-    this.audioQueue = [];
-    
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
-    
-    if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.currentAudio.src = '';
-      this.currentAudio = null;
-    }
-  },
-  
-  // 일시정지
-  pause() {
-    if (this.currentAudio && !this.currentAudio.paused) {
-      this.currentAudio.pause();
-      return true;
-    }
-    return false;
-  },
-  
-  // 재개
-  resume() {
-    if (this.currentAudio && this.currentAudio.paused) {
-      this.currentAudio.play();
-      return true;
-    }
-    return false;
-  }
-};
-
-/* --------- Chatterbox TTS (무료 음성 복제) --------- */
-const CHATTERBOX = {
-  currentAudio: null,
-  abortController: null,
-  
-  // 설정 로드
-  getSettings() {
-    const s = loadState(ELEVENLABS_SETTINGS_KEY, {});
-    return {
-      url: s.chatterboxUrl || '',
-      voicePath: s.chatterboxVoicePath || '/content/audio.wav',
-      exaggeration: s.chatterboxExag ?? 0.5,
-      cfg: s.chatterboxCfg ?? 0.5
-    };
-  },
-  
-  // Chatterbox 사용 여부
-  isEnabled() {
-    const mainSettings = loadState(ELEVENLABS_SETTINGS_KEY, {});
-    const s = this.getSettings();
-    return mainSettings.engine === 'chatterbox' && s.url;
-  },
-  
-  // Gradio API를 통해 TTS 요청
-  async textToSpeech(text) {
-    const s = this.getSettings();
-    if (!s.url) {
-      throw new Error('Chatterbox Gradio URL을 설정해주세요.');
-    }
-    
-    this.abortController = new AbortController();
-    
-    // Gradio API 엔드포인트
-    const apiUrl = s.url.replace(/\/$/, '') + '/api/predict';
-    
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        data: [
-          text,                    // 텍스트
-          s.voicePath,             // 음성 파일 경로
-          s.exaggeration,          // exaggeration
-          s.cfg,                   // cfg/pace
-          null                     // seed (random)
-        ]
-      }),
-      signal: this.abortController.signal
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Chatterbox API 오류: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
-    // Gradio 응답에서 오디오 URL 추출
-    if (result.data && result.data[0]) {
-      const audioData = result.data[0];
-      
-      // base64 데이터인 경우
-      if (typeof audioData === 'string' && audioData.startsWith('data:audio')) {
-        return audioData;
-      }
-      
-      // 파일 경로인 경우
-      if (typeof audioData === 'object' && audioData.name) {
-        return s.url.replace(/\/$/, '') + '/file=' + audioData.name;
-      }
-      
-      // URL인 경우
-      if (typeof audioData === 'string' && audioData.startsWith('http')) {
-        return audioData;
-      }
-    }
-    
-    throw new Error('Chatterbox 응답에서 오디오를 찾을 수 없습니다.');
-  },
-  
-  // 단일 텍스트 재생
-  async speak(text, onStart, onEnd, onError) {
-    if (!text || !text.trim()) {
-      onEnd?.();
-      return;
-    }
-    
-    try {
-      onStart?.();
-      const audioUrl = await this.textToSpeech(text);
-      
-      return new Promise((resolve) => {
-        this.currentAudio = new Audio(audioUrl);
-        this.currentAudio.onended = () => {
-          this.currentAudio = null;
-          onEnd?.();
-          resolve();
-        };
-        this.currentAudio.onerror = (e) => {
-          this.currentAudio = null;
-          onError?.(e);
-          resolve();
-        };
-        this.currentAudio.play().catch(e => {
-          onError?.(e);
-          resolve();
-        });
-      });
-    } catch (e) {
-      if (e.name === 'AbortError') {
-        onEnd?.();
-        return;
-      }
-      onError?.(e);
-      throw e;
-    }
-  },
-  
-  // 문장 배열 순차 재생
-  async speakSentences(sentences, { onSentenceStart, onSentenceEnd, onAllEnd, onError }) {
-    for (let i = 0; i < sentences.length; i++) {
-      const sentence = sentences[i];
-      try {
-        await this.speak(
-          sentence,
-          () => onSentenceStart?.(i, sentence),
-          () => onSentenceEnd?.(i),
-          (e) => onError?.(e, i)
-        );
-      } catch (e) {
-        onError?.(e, i);
-      }
-    }
-    onAllEnd?.();
-  },
-  
-  // 재생 중지
-  stop() {
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
-    
-    if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.currentAudio.src = '';
-      this.currentAudio = null;
-    }
-  },
-  
-  // 일시정지
-  pause() {
-    if (this.currentAudio && !this.currentAudio.paused) {
-      this.currentAudio.pause();
-      return true;
-    }
-    return false;
-  },
-  
-  // 재개
-  resume() {
-    if (this.currentAudio && this.currentAudio.paused) {
-      this.currentAudio.play();
-      return true;
-    }
-    return false;
-  }
-};
-
-// 통합 음성 엔진 (ElevenLabs 또는 Chatterbox)
-function getActiveVoiceEngine() {
-  if (CHATTERBOX.isEnabled()) return CHATTERBOX;
-  if (ELEVENLABS.isEnabled()) return ELEVENLABS;
-  return null;
-}
-
-function isCustomVoiceEnabled() {
-  return CHATTERBOX.isEnabled() || ELEVENLABS.isEnabled();
-}
-
-// 음성 설정 UI 초기화
-function initVoiceSettingsModal() {
-  const btnOpen = el('btnVoiceSettings');
-  const modal = el('voiceSettingsModal');
-  const btnClose = el('closeVoiceSettings');
-  const btnSave = el('saveVoiceSettings');
-  const btnTest = el('testVoiceBtn');
-  const testStatus = el('voiceTestStatus');
-  
-  // 엔진 선택
-  const engineBrowser = el('voiceEngineBrowser');
-  const engineChatterbox = el('voiceEngineChatterbox');
-  const engineElevenLabs = el('voiceEngineElevenLabs');
-  
-  // 설정 패널
-  const chatterboxSettings = el('chatterboxSettings');
-  const elevenLabsSettings = el('elevenLabsSettings');
-  
-  // Chatterbox 입력
-  const chatterboxUrl = el('chatterboxUrl');
-  const chatterboxVoicePath = el('chatterboxVoicePath');
-  const chatterboxExag = el('chatterboxExag');
-  const chatterboxCfg = el('chatterboxCfg');
-  const chatterboxExagVal = el('chatterboxExagVal');
-  const chatterboxCfgVal = el('chatterboxCfgVal');
-  
-  // ElevenLabs 입력
-  const apiKeyInput = el('elevenLabsApiKey');
-  const voiceIdInput = el('elevenLabsVoiceId');
-  const modelSelect = el('elevenLabsModel');
-  const stabilityInput = el('elevenLabsStability');
-  const similarityInput = el('elevenLabsSimilarity');
-  const stabilityVal = el('stabilityVal');
-  const similarityVal = el('similarityVal');
-  
-  if (!modal || !btnOpen) return;
-  
-  // 모달 열기
-  btnOpen.onclick = () => {
-    loadSettingsToUI();
-    modal.style.display = 'flex';
-  };
-  
-  // 모달 닫기
-  btnClose.onclick = () => {
-    modal.style.display = 'none';
-  };
-  
-  modal.onclick = (e) => {
-    if (e.target === modal) modal.style.display = 'none';
-  };
-  
-  // 엔진 선택 토글
-  const toggleSettingsUI = () => {
-    if (chatterboxSettings) {
-      chatterboxSettings.style.display = engineChatterbox?.checked ? 'block' : 'none';
-    }
-    if (elevenLabsSettings) {
-      elevenLabsSettings.style.display = engineElevenLabs?.checked ? 'block' : 'none';
-    }
-  };
-  
-  engineBrowser?.addEventListener('change', toggleSettingsUI);
-  engineChatterbox?.addEventListener('change', toggleSettingsUI);
-  engineElevenLabs?.addEventListener('change', toggleSettingsUI);
-  
-  // 슬라이더 값 표시 - Chatterbox
-  chatterboxExag?.addEventListener('input', () => {
-    if (chatterboxExagVal) chatterboxExagVal.textContent = chatterboxExag.value;
-  });
-  chatterboxCfg?.addEventListener('input', () => {
-    if (chatterboxCfgVal) chatterboxCfgVal.textContent = chatterboxCfg.value;
-  });
-  
-  // 슬라이더 값 표시 - ElevenLabs
-  stabilityInput?.addEventListener('input', () => {
-    if (stabilityVal) stabilityVal.textContent = stabilityInput.value;
-  });
-  similarityInput?.addEventListener('input', () => {
-    if (similarityVal) similarityVal.textContent = similarityInput.value;
-  });
-  
-  // 설정 로드
-  function loadSettingsToUI() {
-    const s = loadState(ELEVENLABS_SETTINGS_KEY, {});
-    
-    // 엔진 선택
-    if (s.engine === 'chatterbox') {
-      if (engineChatterbox) engineChatterbox.checked = true;
-    } else if (s.engine === 'elevenlabs') {
-      if (engineElevenLabs) engineElevenLabs.checked = true;
-    } else {
-      if (engineBrowser) engineBrowser.checked = true;
-    }
-    toggleSettingsUI();
-    
-    // Chatterbox 설정
-    if (chatterboxUrl) chatterboxUrl.value = s.chatterboxUrl || '';
-    if (chatterboxVoicePath) chatterboxVoicePath.value = s.chatterboxVoicePath || '/content/audio.wav';
-    if (chatterboxExag) {
-      chatterboxExag.value = s.chatterboxExag ?? 0.5;
-      if (chatterboxExagVal) chatterboxExagVal.textContent = chatterboxExag.value;
-    }
-    if (chatterboxCfg) {
-      chatterboxCfg.value = s.chatterboxCfg ?? 0.5;
-      if (chatterboxCfgVal) chatterboxCfgVal.textContent = chatterboxCfg.value;
-    }
-    
-    // ElevenLabs 설정
-    if (apiKeyInput) apiKeyInput.value = s.apiKey || '';
-    if (voiceIdInput) voiceIdInput.value = s.voiceId || '';
-    if (modelSelect) modelSelect.value = s.model || 'eleven_multilingual_v2';
-    if (stabilityInput) {
-      stabilityInput.value = s.stability ?? 0.5;
-      if (stabilityVal) stabilityVal.textContent = stabilityInput.value;
-    }
-    if (similarityInput) {
-      similarityInput.value = s.similarity ?? 0.75;
-      if (similarityVal) similarityVal.textContent = similarityInput.value;
-    }
-  }
-  
-  // 설정 저장
-  btnSave.onclick = () => {
-    let engine = 'browser';
-    if (engineChatterbox?.checked) engine = 'chatterbox';
-    else if (engineElevenLabs?.checked) engine = 'elevenlabs';
-    
-    const settings = {
-      engine: engine,
-      // Chatterbox
-      chatterboxUrl: chatterboxUrl?.value?.trim() || '',
-      chatterboxVoicePath: chatterboxVoicePath?.value?.trim() || '/content/audio.wav',
-      chatterboxExag: parseFloat(chatterboxExag?.value) || 0.5,
-      chatterboxCfg: parseFloat(chatterboxCfg?.value) || 0.5,
-      // ElevenLabs
-      apiKey: apiKeyInput?.value?.trim() || '',
-      voiceId: voiceIdInput?.value?.trim() || '',
-      model: modelSelect?.value || 'eleven_multilingual_v2',
-      stability: parseFloat(stabilityInput?.value) || 0.5,
-      similarity: parseFloat(similarityInput?.value) || 0.75
-    };
-    
-    saveState(ELEVENLABS_SETTINGS_KEY, settings);
-    alert('음성 설정이 저장되었습니다!');
-    modal.style.display = 'none';
-  };
-  
-  // 테스트 버튼
-  btnTest.onclick = async () => {
-    const testText = '태초에 하나님이 천지를 창조하시니라.';
-    
-    // Chatterbox 테스트
-    if (engineChatterbox?.checked) {
-      const url = chatterboxUrl?.value?.trim();
-      
-      if (!url) {
-        alert('Chatterbox Gradio URL을 입력해주세요.');
-        return;
-      }
-      
-      testStatus.textContent = '🔄 Chatterbox 연결 중...';
-      btnTest.disabled = true;
-      
-      try {
-        const apiUrl = url.replace(/\/$/, '') + '/api/predict';
-        
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            data: [
-              testText,
-              chatterboxVoicePath?.value || '/content/audio.wav',
-              parseFloat(chatterboxExag?.value) || 0.5,
-              parseFloat(chatterboxCfg?.value) || 0.5,
-              null
-            ]
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Chatterbox 오류: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        let audioUrl = null;
-        
-        if (result.data && result.data[0]) {
-          const audioData = result.data[0];
-          if (typeof audioData === 'string' && audioData.startsWith('data:audio')) {
-            audioUrl = audioData;
-          } else if (typeof audioData === 'object' && audioData.name) {
-            audioUrl = url.replace(/\/$/, '') + '/file=' + audioData.name;
-          } else if (typeof audioData === 'string' && audioData.startsWith('http')) {
-            audioUrl = audioData;
-          }
-        }
-        
-        if (!audioUrl) {
-          throw new Error('오디오 응답을 찾을 수 없습니다.');
-        }
-        
-        testStatus.textContent = '🔊 재생 중...';
-        const audio = new Audio(audioUrl);
-        
-        audio.onended = () => {
-          testStatus.textContent = '✅ Chatterbox 테스트 완료!';
-          btnTest.disabled = false;
-          setTimeout(() => { testStatus.textContent = ''; }, 3000);
-        };
-        
-        audio.onerror = () => {
-          testStatus.textContent = '❌ 재생 오류';
-          btnTest.disabled = false;
-        };
-        
-        audio.play();
-        
-      } catch (e) {
-        testStatus.textContent = '❌ ' + e.message;
-        btnTest.disabled = false;
-      }
-      return;
-    }
-    
-    // ElevenLabs 테스트
-    if (engineElevenLabs?.checked) {
-      const apiKey = apiKeyInput?.value?.trim();
-      const voiceId = voiceIdInput?.value?.trim();
-      
-      if (!apiKey || !voiceId) {
-        alert('API 키와 Voice ID를 입력해주세요.');
-        return;
-      }
-      
-      testStatus.textContent = '🔄 음성 생성 중...';
-      btnTest.disabled = true;
-      
-      try {
-        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-          method: 'POST',
-          headers: {
-            'Accept': 'audio/mpeg',
-            'Content-Type': 'application/json',
-            'xi-api-key': apiKey
-          },
-          body: JSON.stringify({
-            text: testText,
-            model_id: modelSelect?.value || 'eleven_multilingual_v2',
-            voice_settings: {
-              stability: parseFloat(stabilityInput?.value) || 0.5,
-              similarity_boost: parseFloat(similarityInput?.value) || 0.75
-            }
-          })
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail?.message || `API 오류: ${response.status}`);
-        }
-        
-        const audioBlob = await response.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        
-        testStatus.textContent = '🔊 재생 중...';
-        
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          testStatus.textContent = '✅ 테스트 완료!';
-          btnTest.disabled = false;
-          setTimeout(() => { testStatus.textContent = ''; }, 3000);
-        };
-        
-        audio.onerror = () => {
-          testStatus.textContent = '❌ 재생 오류';
-          btnTest.disabled = false;
-        };
-        
-        audio.play();
-        
-      } catch (e) {
-        testStatus.textContent = '❌ ' + e.message;
-        btnTest.disabled = false;
-      }
-    } else {
-      // 브라우저 TTS 테스트
-      testStatus.textContent = '🔊 재생 중...';
-      speakSample(testText);
-      setTimeout(() => { testStatus.textContent = ''; }, 2000);
-    }
-  };
-}
-
-// 통합 TTS 함수 - ElevenLabs 또는 브라우저 TTS 자동 선택
-async function universalSpeak(text, options = {}) {
-  const { onStart, onEnd, onError } = options;
-  
-  if (ELEVENLABS.isEnabled()) {
-    try {
-      await ELEVENLABS.speak(text, onStart, onEnd, onError);
-    } catch (e) {
-      onError?.(e);
-      // ElevenLabs 실패 시 브라우저 TTS로 폴백
-      console.warn('ElevenLabs 실패, 브라우저 TTS로 전환:', e.message);
-      return browserSpeak(text, options);
-    }
-  } else {
-    return browserSpeak(text, options);
-  }
-}
-
-// 브라우저 TTS 래퍼
-function browserSpeak(text, options = {}) {
-  const { onStart, onEnd, onError } = options;
-  const synth = window.speechSynthesis;
-  
-  return new Promise((resolve) => {
-    try { synth.cancel(); } catch(_) {}
-    
-    const u = new SpeechSynthesisUtterance(text);
-    applyVoice(u);
-    
-    u.onstart = () => onStart?.();
-    u.onend = () => { onEnd?.(); resolve(); };
-    u.onerror = (e) => { onError?.(e); resolve(); };
-    
-    synth.speak(u);
-  });
-}
-
-// 통합 TTS 중지
-function universalStop() {
-  // 커스텀 음성 중지
-  CHATTERBOX.stop();
-  ELEVENLABS.stop();
-  
-  // 브라우저 TTS 중지
-  try {
-    window.speechSynthesis?.cancel();
-  } catch(_) {}
-}
-
 /* --------- Tree --------- */
 function buildTree(){
   treeEl.innerHTML = '';
@@ -2348,10 +1697,6 @@ function buildTree(){
         const pcontent = body.querySelector('.pcontent');
         // 성경 본문 편집을 위해 contenteditable 설정
         pcontent.setAttribute('contenteditable', 'true');
-        // Grammarly 확장 프로그램 비활성화 (오류 방지)
-        pcontent.setAttribute('data-gramm', 'false');
-        pcontent.setAttribute('data-gramm_editor', 'false');
-        pcontent.setAttribute('data-enable-grammarly', 'false');
         (p.verses||[]).forEach(([v,t])=>{
           const line = document.createElement('div');
           line.className = 'pline';
@@ -2692,86 +2037,11 @@ function highlightSentenceInLine(line, sentenceIndex, sentences) {
 }
 
 function speakVerseItemInScope(item, scope, onend){
-  // 커스텀 음성 사용 여부 확인
-  const useCustomVoice = isCustomVoiceEnabled();
-  const voiceEngine = getActiveVoiceEngine();
-  
-  if(!useCustomVoice && !READER.synth) {
-    READER.synth = window.speechSynthesis || null;
-    if(!READER.synth) return;
-  }
+  if(!READER.synth) return;
   
   // 절 텍스트를 문장으로 분할
   const sentences = splitToSentences(item.text);
   const line = scope.querySelector(`.pline[data-verse="${item.verse}"]`);
-  
-  // 커스텀 음성(Chatterbox/ElevenLabs)으로 낭독
-  if (useCustomVoice && voiceEngine) {
-    clearReadingHighlight(scope);
-    if(line){ 
-      line.classList.add('reading'); 
-      line.scrollIntoView({block:'center', behavior:'smooth'}); 
-    }
-    
-    if (sentences.length === 0) {
-      // 문장이 없으면 전체 텍스트 읽기
-      voiceEngine.speak(
-        String(item.text),
-        () => status('🎤 내 음성으로 낭독 중...'),
-        () => onend(),
-        (e) => {
-          console.error('커스텀 음성 오류:', e);
-          // 오류 시 브라우저 TTS로 폴백
-          speakVerseWithBrowserTTS(item, scope, line, onend);
-        }
-      );
-    } else {
-      // 문장 단위로 읽기
-      let currentIdx = 0;
-      
-      async function speakNextWithCustomVoice() {
-        if (!READER.playing || currentIdx >= sentences.length) {
-          onend();
-          return;
-        }
-        
-        const sentence = sentences[currentIdx];
-        if (line) {
-          highlightSentenceInLine(line, currentIdx, sentences);
-        }
-        
-        try {
-          await voiceEngine.speak(
-            sentence,
-            () => {},
-            () => {
-              currentIdx++;
-              speakNextWithCustomVoice();
-            },
-            (e) => {
-              console.error('커스텀 음성 문장 오류:', e);
-              currentIdx++;
-              speakNextWithCustomVoice();
-            }
-          );
-        } catch (e) {
-          currentIdx++;
-          speakNextWithCustomVoice();
-        }
-      }
-      
-      speakNextWithCustomVoice();
-    }
-    return;
-  }
-  
-  // 브라우저 TTS로 낭독
-  speakVerseWithBrowserTTS(item, scope, line, onend);
-}
-
-// 브라우저 TTS로 절 낭독 (폴백용)
-function speakVerseWithBrowserTTS(item, scope, line, onend) {
-  const sentences = splitToSentences(item.text);
   
   if (sentences.length === 0) {
     // 문장이 없으면 기존 방식대로 처리
@@ -2883,12 +2153,6 @@ function playNextInQueueInline(book, chap, idx){
 }
 function stopSpeakInline(){
   READER.playing = false;
-  
-  // 커스텀 음성 중지
-  CHATTERBOX.stop();
-  ELEVENLABS.stop();
-  
-  // 브라우저 TTS 중지
   try{ READER.synth && READER.synth.cancel(); }catch(e){}
   if (READER._wd){ clearTimeout(READER._wd); READER._wd = null; }
   if(READER.scope){
@@ -3213,57 +2477,6 @@ function openSermonEditorDirectly(sermonIdx = 0){
     insertVerseBtn.style.display = 'none';
   }
   
-  // 플로팅 툴바 설정 (설교 편집기용)
-  setTimeout(() => {
-    const wbpPlbar = document.getElementById('wbp-plbar');
-    if (wbpPlbar && sermonBody && typeof createFloatingToolbar === 'function') {
-      // 7색 팔레트 주입 (이미 있으면 스킵)
-      (function injectPalette(){
-        if(wbpPlbar.querySelector('.wbp-colors')) return;
-        const PALETTE = ['#ff4d4f','#faad14','#fadb14','#52c41a','#1677ff','#722ed1','#ffffff'];
-        const wrap = document.createElement('div');
-        wrap.className = 'wbp-colors';
-        PALETTE.forEach(hex=>{
-          const b = document.createElement('button');
-          b.type='button'; 
-          b.title=hex === '#ffffff' ? '흰색' : hex; 
-          b.style.cssText=`width:22px;height:22px;border-radius:5px;border:1px solid ${hex === '#ffffff' ? '#666' : '#2a3040'};background:${hex};`;
-          b.addEventListener('click', ()=>{
-            document.execCommand?.('foreColor', false, hex);
-          });
-          wrap.appendChild(b);
-        });
-        wbpPlbar.appendChild(wrap);
-      })();
-
-      // selectionFilter: 설교 편집기 내부에서만 허용
-      function inSermonEditor() {
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0) return false;
-        const c = sel.getRangeAt(0).commonAncestorContainer;
-        const el = (c.nodeType === 1 ? c : c.parentElement);
-        if (!el) return false;
-        // 설교 편집기 내부에 있는지 확인
-        return sermonBody.contains(el);
-      }
-
-      // 명령 핸들러
-      function handleCommand(cmd, val) {
-        document.execCommand(cmd, false, val);
-      }
-
-      createFloatingToolbar({
-        barElement: wbpPlbar,
-        colorElement: null,
-        rootContainer: sermonBody,
-        selectionFilter: inSermonEditor,
-        commandHandler: handleCommand,
-        windowObj: window,
-        docObj: document
-      });
-    }
-  }, 100);
-  
   // 모달이 열린 후 포커스를 모달 내부로 이동 (접근성 개선)
   setTimeout(() => {
     const firstFocusable = modalWrap.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
@@ -3356,19 +2569,6 @@ function setupInsertVerseButton(){
 
 /* ✅ 기존 모달 기반 설교 시스템은 제거됨 - openSermonEditorDirectly 사용 */
 el('closeModal').onclick = ()=>{ 
-  // 포커스를 모달 밖으로 이동 (접근성 개선)
-  const activeElement = document.activeElement;
-  if (activeElement && modalWrap.contains(activeElement)) {
-    // 포커스를 body로 이동
-    if (document.body) {
-      document.body.focus();
-      // body는 포커스를 받을 수 없으므로 blur 처리
-      if (activeElement && typeof activeElement.blur === 'function') {
-        activeElement.blur();
-      }
-    }
-  }
-  
   // display를 먼저 none으로 설정한 후 aria-hidden을 true로 설정 (접근성 개선)
   modalWrap.style.display='none'; 
   // 모달이 실제로 닫힌 후에만 aria-hidden을 true로 설정
@@ -4092,15 +3292,6 @@ function parseSermonText(text) {
 el('cancelEdit')?.addEventListener('click', ()=>{
   if(sermonEditor.dataset.ctxType){
     sermonEditor.dataset.ctxType = '';
-    
-    // 포커스를 모달 밖으로 이동 (접근성 개선)
-    const activeElement = document.activeElement;
-    if (activeElement && modalWrap.contains(activeElement)) {
-      if (activeElement && typeof activeElement.blur === 'function') {
-        activeElement.blur();
-      }
-    }
-    
     modalWrap.style.display = 'none'; 
     // 모달이 실제로 닫힌 후에만 aria-hidden을 true로 설정
     requestAnimationFrame(() => {
@@ -4219,15 +3410,6 @@ el('saveSermon').onclick = () => {
 
     sermonEditor.dataset.ctxType = '';
     sermonEditor.classList.remove('context-editor');
-    
-    // 포커스를 모달 밖으로 이동 (접근성 개선)
-    const activeElement = document.activeElement;
-    if (activeElement && modalWrap.contains(activeElement)) {
-      if (activeElement && typeof activeElement.blur === 'function') {
-        activeElement.blur();
-      }
-    }
-    
     modalWrap.style.display = 'none';
     // 모달이 실제로 닫힌 후에만 aria-hidden을 true로 설정
     requestAnimationFrame(() => {
@@ -4348,10 +3530,8 @@ let EDITOR_TTS = {
   sents: [],
   idx: 0,
   playing: false,
-  paused: false,
   synth: window.speechSynthesis || null,
-  utter: null,
-  useCustomVoice: false
+  utter: null
 };
 
 // HTML을 일반 텍스트로 변환
@@ -4362,47 +3542,38 @@ function htmlToPlainText(html) {
   return (tmp.textContent || '').replace(/\s+\n/g, '\n').replace(/\n{2,}/g, '\n').replace(/\s+/g, ' ').trim();
 }
 
-// splitToSentences는 2602줄 부근에서 정의됨 (중복 제거)
+// 문장 분할 (한국어/영문 종결부호 기준)
+function splitToSentences(text) {
+  const t = String(text || '').trim();
+  if (!t) return [];
+  // 마침표, 물음표, 느낌표, 말줄임표, 한국어 종결(다.)도 일반 마침표로 처리
+  const parts = t.split(/(?<=[\.!\?…]|[。！？])\s+/u).filter(s => s && s.trim().length > 0);
+  return parts;
+}
 
 function toggleEditorSpeak(){
-  // 커스텀 음성 사용 여부 확인
-  EDITOR_TTS.useCustomVoice = isCustomVoiceEnabled();
-  const voiceEngine = getActiveVoiceEngine();
+  // speechSynthesis가 없으면 재시도
+  if(!EDITOR_TTS.synth) {
+    EDITOR_TTS.synth = window.speechSynthesis || null;
+    if(!EDITOR_TTS.synth) return alert('이 브라우저는 음성합성을 지원하지 않습니다.');
+  }
   
-  // 재생 중인 경우 일시정지/재개/중지 처리
+  // 재생 중인 경우 일시정지/재개 처리
   if(EDITOR_TTS.playing) {
-    if (EDITOR_TTS.useCustomVoice && voiceEngine) {
-      // 커스텀 음성(Chatterbox/ElevenLabs) 일시정지/재개
-      if (!EDITOR_TTS.paused) {
-        if (voiceEngine.pause()) {
-          EDITOR_TTS.paused = true;
-          editorSpeakBtn.textContent = '재개';
-        }
-        return;
-      } else {
-        if (voiceEngine.resume()) {
-          EDITOR_TTS.paused = false;
-          editorSpeakBtn.textContent = '일시정지';
-        }
-        return;
-      }
+    if(EDITOR_TTS.synth.speaking && !EDITOR_TTS.synth.paused) {
+      // 일시정지
+      EDITOR_TTS.synth.pause();
+      editorSpeakBtn.textContent = '재개';
+      return;
+    } else if(EDITOR_TTS.synth.paused) {
+      // 재개
+      EDITOR_TTS.synth.resume();
+      editorSpeakBtn.textContent = '일시정지';
+      return;
     } else {
-      // 브라우저 TTS 일시정지/재개
-      if(!EDITOR_TTS.synth) {
-        EDITOR_TTS.synth = window.speechSynthesis || null;
-      }
-      if(EDITOR_TTS.synth?.speaking && !EDITOR_TTS.synth?.paused) {
-        EDITOR_TTS.synth.pause();
-        editorSpeakBtn.textContent = '재개';
-        return;
-      } else if(EDITOR_TTS.synth?.paused) {
-        EDITOR_TTS.synth.resume();
-        editorSpeakBtn.textContent = '일시정지';
-        return;
-      } else {
-        stopEditorSpeak();
-        return;
-      }
+      // 재생 중이지만 speaking이 false인 경우 중지
+      stopEditorSpeak();
+      return;
     }
   }
 
@@ -4426,53 +3597,13 @@ function toggleEditorSpeak(){
 
   EDITOR_TTS.idx = 0;
   EDITOR_TTS.playing = true;
-  EDITOR_TTS.paused = false;
   editorSpeakBtn.textContent = '일시정지';
   
-  // 커스텀 음성 또는 브라우저 TTS로 시작
-  if (EDITOR_TTS.useCustomVoice) {
-    speakEditorWithCustomVoice();
-  } else {
-    speakEditorSentence(0);
-  }
+  // 첫 문장부터 시작
+  speakEditorSentence(0);
 }
 
-// 커스텀 음성(Chatterbox/ElevenLabs)으로 에디터 낭독
-async function speakEditorWithCustomVoice() {
-  const voiceEngine = getActiveVoiceEngine();
-  if (!voiceEngine) {
-    speakEditorSentence(0);
-    return;
-  }
-  
-  await voiceEngine.speakSentences(EDITOR_TTS.sents, {
-    onSentenceStart: (i, sentence) => {
-      EDITOR_TTS.idx = i;
-      status(`🎤 내 음성으로 낭독 중... (${i+1}/${EDITOR_TTS.sents.length})`);
-    },
-    onSentenceEnd: (i) => {
-      // 문장 끝
-    },
-    onAllEnd: () => {
-      stopEditorSpeak(true);
-    },
-    onError: (e, i) => {
-      console.error('커스텀 음성 낭독 오류:', e);
-      // 오류 발생 시 브라우저 TTS로 폴백
-      if (EDITOR_TTS.playing && i !== undefined) {
-        status('⚠️ 음성 엔진 오류, 브라우저 TTS로 전환...');
-        EDITOR_TTS.useCustomVoice = false;
-        speakEditorSentence(i);
-      }
-    }
-  });
-}
-
-// 브라우저 TTS로 문장 낭독
 function speakEditorSentence(i) {
-  if (!EDITOR_TTS.synth) {
-    EDITOR_TTS.synth = window.speechSynthesis || null;
-  }
   if (!EDITOR_TTS.synth || !EDITOR_TTS.playing) return;
   if (i < 0 || i >= EDITOR_TTS.sents.length) {
     stopEditorSpeak(true);
@@ -4514,13 +3645,6 @@ function speakEditorSentence(i) {
 
 function stopEditorSpeak(silent){
   EDITOR_TTS.playing = false;
-  EDITOR_TTS.paused = false;
-  
-  // 커스텀 음성 중지
-  CHATTERBOX.stop();
-  ELEVENLABS.stop();
-  
-  // 브라우저 TTS 중지
   if(EDITOR_TTS.synth){ 
     try{ 
       EDITOR_TTS.synth.cancel();
@@ -4773,7 +3897,7 @@ main { height:auto !important; overflow:visible !important; }
     <!-- 여기 뒤에 6색 팔레트 + 기타 드롭다운이 JS로 주입됩니다 -->
   </div>
 
-  <div id="editorRoot" class="rte" contenteditable="true" spellcheck="false" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false" aria-label="Sermon Editor" style="min-height:360px;resize:vertical;padding:14px;background:#161922;border:1px solid #2a3040;border-radius:10px;line-height:1.85;letter-spacing:.015em;caret-color:var(--accent);outline:none"></div>
+  <div id="editorRoot" class="rte" contenteditable="true" spellcheck="false" aria-label="Sermon Editor" style="min-height:360px;resize:vertical;padding:14px;background:#161922;border:1px solid #2a3040;border-radius:10px;line-height:1.85;letter-spacing:.015em;caret-color:var(--accent);outline:none"></div>
 
   <div id="readPane" aria-label="Reading Sentences"></div>
 
@@ -5617,65 +4741,8 @@ window.addEventListener('resize', adjustModalEditorPadding);
 document.getElementById('sermonTitle')?.addEventListener('input', adjustModalEditorPadding);
 window.addEventListener('load', adjustModalEditorPadding);
 
-/* ===== 인라인 제목 편집 ===== */
-function startInlineTitleEdit(titleEl, book, chap, idx){
-  if (!titleEl || titleEl.isContentEditable) return;
-  
-  const originalText = titleEl.textContent || '';
-  
-  // contenteditable 활성화
-  titleEl.contentEditable = 'true';
-  titleEl.focus();
-  
-  // 텍스트 전체 선택
-  const range = document.createRange();
-  range.selectNodeContents(titleEl);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-  
-  // 편집 완료 처리 함수
-  const finishEdit = (save = true) => {
-    titleEl.contentEditable = 'false';
-    const newText = (titleEl.textContent || '').trim();
-    
-    if (save && newText && newText !== originalText) {
-      // BIBLE 데이터 및 DOM 업데이트
-      updateParaTitle(book, chap, idx, newText);
-      status(`제목이 "${newText}"로 변경되었습니다.`);
-    } else if (!save || !newText) {
-      // 취소 또는 빈 텍스트면 원래 값 복원
-      titleEl.textContent = originalText;
-    }
-    
-    // 이벤트 리스너 정리
-    titleEl.removeEventListener('blur', handleBlur);
-    titleEl.removeEventListener('keydown', handleKeydown);
-  };
-  
-  // blur 핸들러 (편집 영역 벗어나면 저장)
-  const handleBlur = () => {
-    // setTimeout으로 지연시켜 키보드 이벤트가 먼저 처리되도록 함
-    setTimeout(() => {
-      if (!titleEl.isContentEditable) return;
-      finishEdit(true);
-    }, 100);
-  };
-  
-  // 키보드 핸들러
-  const handleKeydown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      finishEdit(true);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      finishEdit(false);
-    }
-  };
-  
-  titleEl.addEventListener('blur', handleBlur);
-  titleEl.addEventListener('keydown', handleKeydown);
-}
+/* ===== 인라인 제목 편집 더미 ===== */
+function startInlineTitleEdit(){ /* 필요 시 실제 구현으로 교체 */ }
 
 /* === 공통 플로팅 툴바 모듈 === */
 function createFloatingToolbar(options) {
@@ -6291,44 +5358,10 @@ function createFloatingToolbar(options) {
       return false;
     }
     
-    // 시작 또는 끝이 .pcontent/.pline 내부에 있으면 확인
+    // 시작 또는 끝이 .pcontent/.pline 내부에 있으면 허용
     const startInPcontent = isInPcontent(startContainer);
     const endInPcontent = isInPcontent(endContainer);
     if (startInPcontent || endInPcontent) {
-      // .pline 내부 선택은 플로팅 툴바를 허용 (글자색 적용 가능)
-      const startPline = startContainer.nodeType === 3 
-        ? startContainer.parentElement?.closest('.pline')
-        : startContainer.closest?.('.pline');
-      const endPline = endContainer.nodeType === 3
-        ? endContainer.parentElement?.closest('.pline')
-        : endContainer.closest?.('.pline');
-      
-      // .pline 내부 선택이면 플로팅 툴바 허용
-      if (startPline || endPline) {
-        if (DEBUG) {
-          addDebugLog(`✅ .pline 내부 선택은 플로팅 툴바 허용`, 'success');
-        }
-        const elapsed = (performance.now() - startTime).toFixed(2);
-        if (DEBUG) addDebugLog(`⏱️ 처리 시간: ${elapsed}ms`, 'info');
-        return true; // .pline 내부 선택은 플로팅 툴바 표시
-      }
-      
-      // .pline 외부의 .pcontent 선택은 플로팅 툴바 비활성화
-      const startPcontent = startContainer.nodeType === 3 
-        ? startContainer.parentElement?.closest('.pcontent')
-        : startContainer.closest?.('.pcontent');
-      const endPcontent = endContainer.nodeType === 3
-        ? endContainer.parentElement?.closest('.pcontent')
-        : endContainer.closest?.('.pcontent');
-      
-      if (startPcontent || endPcontent) {
-        if (DEBUG) {
-          addDebugLog(`❌ .pcontent 직접 선택 (pline 아님)은 플로팅 툴바 비활성화`, 'info');
-        }
-        return false;
-      }
-      
-      // 기타 영역은 허용
       if (DEBUG) {
         const info = {
           startInPcontent,
@@ -6336,8 +5369,8 @@ function createFloatingToolbar(options) {
           startContainer: startContainer.nodeType === 3 ? startContainer.textContent?.substring(0, 20) : startContainer.tagName,
           endContainer: endContainer.nodeType === 3 ? endContainer.textContent?.substring(0, 20) : endContainer.tagName
         };
-        console.log('[inVerse] ✅ 기타 영역 선택 허용', info);
-        addDebugLog(`✅ 기타 영역 선택 허용 (start: ${startInPcontent}, end: ${endInPcontent})`, 'success');
+        console.log('[inVerse] ✅ .pcontent/.pline 내부 선택 허용', info);
+        addDebugLog(`✅ .pcontent/.pline 내부 선택 허용 (start: ${startInPcontent}, end: ${endInPcontent})`, 'success');
       }
       const elapsed = (performance.now() - startTime).toFixed(2);
       if (DEBUG) addDebugLog(`⏱️ 처리 시간: ${elapsed}ms`, 'info');
@@ -6411,16 +5444,8 @@ function createFloatingToolbar(options) {
     }
     
     if (isInTree) {
-      // .pcontent 내부 선택은 플로팅 툴바를 표시하지 않음 (서식 버튼 영역 사용)
-      if (pcontent) {
-        if (DEBUG) {
-          addDebugLog(`❌ .pcontent 내부 선택은 플로팅 툴바 비활성화`, 'info');
-        }
-        return false; // .pcontent 내부 선택은 플로팅 툴바 표시 안 함
-      }
-      
-      // .pcontent가 아닌 다른 영역(.pline 등)은 허용
-      if (pline || verse || verseLine) {
+      // .pcontent 내부에서 선택된 경우도 허용 (여러 .pline에 걸친 선택 포함)
+      if (pcontent || pline || verse || verseLine) {
         if (DEBUG) {
           const info = {
             hasPcontent: !!pcontent,
@@ -6430,9 +5455,9 @@ function createFloatingToolbar(options) {
             elTag: el.tagName,
             elClass: el.className
           };
-          console.log('[inVerse] ✅ #tree 내부 .pline 선택 허용', info);
-          addDebugLog(`✅ #tree 내부 .pline 선택 허용`, 'success');
-          addDebugLog(`  - pline: ${!!pline}`, 'info');
+          console.log('[inVerse] ✅ #tree 내부 .pcontent/.pline 선택 허용', info);
+          addDebugLog(`✅ #tree 내부 .pcontent/.pline 선택 허용`, 'success');
+          addDebugLog(`  - pcontent: ${!!pcontent}, pline: ${!!pline}`, 'info');
         }
         const elapsed = (performance.now() - startTime).toFixed(2);
         if (DEBUG) addDebugLog(`⏱️ 처리 시간: ${elapsed}ms`, 'info');
@@ -6831,8 +5856,13 @@ if (document.readyState === 'loading') {
   bindBookChipsToFlowEditor();
 }
 
-// bindFlowEditorToBookChips 함수는 정의되지 않았으므로 호출 제거
-// 대신 bindBookHeadChipsToFlowEditor와 bindBookChipsToFlowEditor가 이미 같은 기능을 수행함
+// 초기/재렌더 훅 연결(중복 호출 허용, 내부에서 자체 가드)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bindFlowEditorToBookChips);
+} else {
+  bindFlowEditorToBookChips();
+}
+document.addEventListener('wbp:treeBuilt', bindFlowEditorToBookChips);
 
 // === [BOOK-CHIPS DIRECT BIND → 내용흐름 편집기 동일 기능] ================
 // === [BOOK-CHIPS DIRECT BIND → UNIT CONTEXT 편집기 사용] ================
@@ -7072,4 +6102,4 @@ function openUnitContextEditor(book, chap, paraIdx, type){
   });
 }
 
-})();vv
+})();
