@@ -219,42 +219,7 @@ function _bookKeyFromSummary(sumEl, type){
   return `${BOOK_UNIT_NS}:${bookId}:${type}`;
 }
 
-// 기존 단위 에디터 팝업을 재사용 (없으면 생성)
-function _ensureBookUnitEditorHost(){
-  let host = document.getElementById('unitEditor');
-  if (host) return host;
-  host = document.createElement('div');
-  host.id = 'unitEditor';
-  host.className = 'unit-editor';
-  host.innerHTML = `
-    <header>
-      <div class="ue-title">단위 에디터</div>
-      <div class="ue-actions">
-        <button type="button" id="ueSave">저장</button>
-        <button type="button" id="ueClose">닫기</button>
-      </div>
-    </header>
-    <textarea id="ueText" placeholder="여기에 내용을 입력하세요. (자동저장)"></textarea>
-  `;
-  document.body.appendChild(host);
-  // 닫기
-  host.querySelector('#ueClose').addEventListener('click', ()=> { host.style.display = 'none'; });
-  // 수동 저장
-  host.querySelector('#ueSave').addEventListener('click', ()=>{
-    const key = host.dataset.key;
-    if (key) saveState(key, host.querySelector('#ueText').value || '');
-  });
-  // 자동 저장(디바운스)
-  let _tm = null;
-  host.querySelector('#ueText').addEventListener('input', ()=>{
-    clearTimeout(_tm);
-    _tm = setTimeout(()=>{
-      const key = host.dataset.key;
-      if (key) debounceSave(key, host.querySelector('#ueText').value || '', 400);
-    }, 400);
-  });
-  return host;
-}
+// _ensureBookUnitEditorHost는 _ensureUnitEditorHost와 통합됨 (379줄 참조)
 
 // 책 단위 에디터 열기
 function openBookEditor(type, sumEl){
@@ -264,7 +229,7 @@ function openBookEditor(type, sumEl){
   const key = _bookKeyFromSummary(sum, type);
   if (!key) { alert('책 키 생성 실패: .btitle data-book 또는 텍스트 확인'); return; }
 
-  const host = _ensureBookUnitEditorHost();
+  const host = _ensureUnitEditorHost();  // 통합된 함수 사용
   const label = (type === 'basic') ? '기본이해' : (type === 'structure' ? '내용구조' : '메세지요약');
   host.dataset.key = key;
   host.querySelector('.ue-title').textContent = `단위 에디터 — ${label} (책 단위)`;
@@ -433,7 +398,7 @@ function openUnitEditor(type){
 }
 
 // ===== [FORMAT-PERSIST BACKUP] 내보내기/가져오기 유틸 (WBP3_FMT) BEGIN =====
-// const FMT_NS = typeof FMT_NS === 'string' ? FMT_NS : 'WBP3_FMT'; // 이미 있으면 재사용
+const FMT_NS = 'WBP3_FMT';  // 서식 네임스페이스
 
 function wbpExportFormats(){
   try{
@@ -1071,7 +1036,7 @@ const VOICE_CHOICE_KEY    = 'wbps.tts.choice.v2';
 const STORAGE_BOOK_BASIC   = 'WBP3_BOOK_BASIC';
 const STORAGE_BOOK_STRUCT  = 'WBP3_BOOK_STRUCT';
 const STORAGE_BOOK_SUMMARY = 'WBP3_BOOK_SUMMARY';
-const FMT_NS = 'WBP3_FMT';  // 서식 네임스페이스 (validateState에서 사용)
+// FMT_NS는 435줄 부근에서 정의됨 (wbpExportFormats 함수 앞)
 
 // ===== [ElevenLabs TTS 설정] =====
 const ELEVENLABS_SETTINGS_KEY = 'wbps.elevenlabs.settings.v1';
@@ -4397,14 +4362,7 @@ function htmlToPlainText(html) {
   return (tmp.textContent || '').replace(/\s+\n/g, '\n').replace(/\n{2,}/g, '\n').replace(/\s+/g, ' ').trim();
 }
 
-// 문장 분할 (한국어/영문 종결부호 기준)
-function splitToSentences(text) {
-  const t = String(text || '').trim();
-  if (!t) return [];
-  // 마침표, 물음표, 느낌표, 말줄임표, 한국어 종결(다.)도 일반 마침표로 처리
-  const parts = t.split(/(?<=[\.!\?…]|[。！？])\s+/u).filter(s => s && s.trim().length > 0);
-  return parts;
-}
+// splitToSentences는 2602줄 부근에서 정의됨 (중복 제거)
 
 function toggleEditorSpeak(){
   // 커스텀 음성 사용 여부 확인
@@ -5659,8 +5617,65 @@ window.addEventListener('resize', adjustModalEditorPadding);
 document.getElementById('sermonTitle')?.addEventListener('input', adjustModalEditorPadding);
 window.addEventListener('load', adjustModalEditorPadding);
 
-/* ===== 인라인 제목 편집 더미 ===== */
-function startInlineTitleEdit(){ /* 필요 시 실제 구현으로 교체 */ }
+/* ===== 인라인 제목 편집 ===== */
+function startInlineTitleEdit(titleEl, book, chap, idx){
+  if (!titleEl || titleEl.isContentEditable) return;
+  
+  const originalText = titleEl.textContent || '';
+  
+  // contenteditable 활성화
+  titleEl.contentEditable = 'true';
+  titleEl.focus();
+  
+  // 텍스트 전체 선택
+  const range = document.createRange();
+  range.selectNodeContents(titleEl);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  
+  // 편집 완료 처리 함수
+  const finishEdit = (save = true) => {
+    titleEl.contentEditable = 'false';
+    const newText = (titleEl.textContent || '').trim();
+    
+    if (save && newText && newText !== originalText) {
+      // BIBLE 데이터 및 DOM 업데이트
+      updateParaTitle(book, chap, idx, newText);
+      status(`제목이 "${newText}"로 변경되었습니다.`);
+    } else if (!save || !newText) {
+      // 취소 또는 빈 텍스트면 원래 값 복원
+      titleEl.textContent = originalText;
+    }
+    
+    // 이벤트 리스너 정리
+    titleEl.removeEventListener('blur', handleBlur);
+    titleEl.removeEventListener('keydown', handleKeydown);
+  };
+  
+  // blur 핸들러 (편집 영역 벗어나면 저장)
+  const handleBlur = () => {
+    // setTimeout으로 지연시켜 키보드 이벤트가 먼저 처리되도록 함
+    setTimeout(() => {
+      if (!titleEl.isContentEditable) return;
+      finishEdit(true);
+    }, 100);
+  };
+  
+  // 키보드 핸들러
+  const handleKeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      finishEdit(true);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      finishEdit(false);
+    }
+  };
+  
+  titleEl.addEventListener('blur', handleBlur);
+  titleEl.addEventListener('keydown', handleKeydown);
+}
 
 /* === 공통 플로팅 툴바 모듈 === */
 function createFloatingToolbar(options) {
@@ -7057,4 +7072,4 @@ function openUnitContextEditor(book, chap, paraIdx, type){
   });
 }
 
-})();
+})();vv
