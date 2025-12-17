@@ -203,6 +203,19 @@
     details.para .pcontent[contenteditable="true"]{
       outline: 1px dashed #3b4b7a; outline-offset: 2px;
     }
+    
+    /* 🔧 절 내용(.pline) 선택/편집 가능 표시 */
+    .pline {
+      cursor: text;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .pline::selection, .pline *::selection {
+      background: rgba(110, 168, 254, 0.35);
+    }
+    .pcontent[contenteditable="true"] .pline:hover {
+      background: color-mix(in hsl, var(--panel) 75%, var(--accent) 5%);
+    }
 
     /* ===== Unit Chips (ptitle 옆 흐릿한 버튼) ===== */
     .unit-chips { 
@@ -847,6 +860,7 @@
       if(!sel || !sel.rangeCount) return null;
       const n = sel.getRangeAt(0).commonAncestorContainer;
       const el = (n.nodeType===1 ? n : n.parentElement);
+      
       // 모든 편집기의 #sermonBody 인식
       // - 책 단위: book-basic, book-struct, book-summary
       // - 단락 단위: summary, unit, whole, commentary
@@ -861,7 +875,27 @@
           }
         }
       }
-      return el?.closest?.('.pline, .verse-line, p.verse') || null;
+      
+      // 🔧 .pline 우선, 없으면 .pcontent 내부의 선택도 허용
+      const pline = el?.closest?.('.pline, .verse-line, p.verse');
+      if (pline) return pline;
+      
+      // .pcontent 내부에서 직접 선택한 경우 (다중 절 선택 등)
+      const pcontent = el?.closest?.('.pcontent');
+      if (pcontent && pcontent.closest('#tree')) {
+        // 선택 범위의 시작점에서 가장 가까운 .pline 찾기
+        const range = sel.getRangeAt(0);
+        const startEl = range.startContainer.nodeType === 1 
+          ? range.startContainer 
+          : range.startContainer.parentElement;
+        const nearestPline = startEl?.closest?.('.pline, .verse-line, p.verse');
+        if (nearestPline) return nearestPline;
+        
+        // 그래도 없으면 pcontent 자체 반환 (다중 절 선택 시)
+        return pcontent;
+      }
+      
+      return null;
     }
     function hasRealSelection(){
       const sel = window.getSelection?.();
@@ -996,30 +1030,60 @@
       }, 200); // 120ms에서 200ms로 증가하여 무한 루프 방지
     });
     // mouseup과 selectionchange 이벤트 - .pline 영역에서도 동작하도록
+    // 🔧 .pcontent를 contenteditable로 만들어 텍스트 선택/서식 지원
+    function ensurePcontentEditable(el) {
+      const pcontent = el?.closest?.('.pcontent');
+      if (pcontent && pcontent.getAttribute('contenteditable') !== 'true') {
+        pcontent.setAttribute('contenteditable', 'true');
+      }
+    }
+    
     document.addEventListener('mouseup', (e)=> {
-      // .pline 내부 선택에서 작동
       const target = e.target;
-      const inPline = target.closest?.('.pline');
       const inTree = target.closest?.('#tree');
-      if (inPline && inTree) {
+      if (!inTree) return;
+      
+      // .pline 또는 .pcontent 내부에서 선택
+      const inPline = target.closest?.('.pline');
+      const inPcontent = target.closest?.('.pcontent');
+      
+      if (inPline || inPcontent) {
+        ensurePcontentEditable(target);
         setTimeout(showBarMaybe, 10);
       }
     });
+    
     document.addEventListener('selectionchange', ()=> {
-      // 선택이 있을 때만 체크
       const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-        const n = sel.getRangeAt(0).commonAncestorContainer;
-        const el = (n.nodeType === 1 ? n : n.parentElement);
-        const inPline = el?.closest?.('.pline');
-        const inTree = el?.closest?.('#tree');
-        if (inPline && inTree) {
-          setTimeout(showBarMaybe, 10);
-        }
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+      
+      const n = sel.getRangeAt(0).commonAncestorContainer;
+      const el = (n.nodeType === 1 ? n : n.parentElement);
+      const inTree = el?.closest?.('#tree');
+      if (!inTree) return;
+      
+      const inPline = el?.closest?.('.pline');
+      const inPcontent = el?.closest?.('.pcontent');
+      
+      if (inPline || inPcontent) {
+        ensurePcontentEditable(el);
+        setTimeout(showBarMaybe, 10);
       }
     });
     window.addEventListener('scroll', hide, {passive:true});
     window.addEventListener('resize', hide);
+    
+    // 🔧 단락(details.para) 열릴 때 .pcontent를 contenteditable로 만들기
+    document.addEventListener('toggle', (e) => {
+      const details = e.target;
+      if (!details.matches?.('details.para')) return;
+      if (details.open) {
+        const pcontent = details.querySelector('.pcontent');
+        if (pcontent) {
+          pcontent.setAttribute('contenteditable', 'true');
+        }
+      }
+    }, true);
 
     let isSavingLine = false; // 무한 루프 방지 플래그
     function saveCurrentLine(){
@@ -1032,7 +1096,14 @@
       }
       isSavingLine = true;
       try {
-        WBP_FMT.saveLine(line);
+        // 🔧 .pcontent인 경우 내부의 모든 .pline 저장
+        if (line.classList?.contains('pcontent')) {
+          line.querySelectorAll('.pline').forEach(pline => {
+            WBP_FMT.saveLine(pline);
+          });
+        } else {
+          WBP_FMT.saveLine(line);
+        }
       } finally {
         // 다음 이벤트 루프에서 플래그 해제
         setTimeout(() => { isSavingLine = false; }, 0);
