@@ -999,6 +999,158 @@ function ensureUnitChips(){
   });
 }
 
+// ===== [FLOATING SELECTION TOOLBAR] 선택 시 작은 툴바 노출 =====
+function _ensureFloatingPlbar(){
+  if (document.getElementById('wbp-plbar')) return;
+  const bar = document.createElement('div');
+  bar.id = 'wbp-plbar';
+  bar.setAttribute('hidden', '');
+  bar.innerHTML = `
+    <button type="button" data-cmd="bold">B</button>
+    <button type="button" data-cmd="italic">I</button>
+    <button type="button" data-cmd="underline">U</button>
+    <div class="divider"></div>
+    <input type="color" id="wbp-color-picker" title="색상 선택" style="width:34px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,.06);padding:0">
+    <div class="divider"></div>
+    <button type="button" id="wbp-save-format">저장</button>
+  `;
+  document.body.appendChild(bar);
+
+  bar.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    const cmd = btn.dataset && btn.dataset.cmd;
+    if (cmd) {
+      // try execCommand first, fallback to range wrap
+      try{ document.execCommand(cmd); }
+      catch(e){ _wrapSelectionWithTag(cmd); }
+      // keep toolbar visible
+    } else if (btn.id === 'wbp-save-format'){
+      try{ saveFormatForOpenPara(); }
+      catch(e){ console.error('saveFormatForOpenPara error', e); }
+    }
+  });
+  // 색상 입력 처리 (input 이벤트)
+  const colorInp = bar.querySelector('#wbp-color-picker');
+  if (colorInp){
+    colorInp.addEventListener('input', (ev)=>{
+      const color = ev.target.value;
+      if (!color) return;
+      try{
+        document.execCommand('foreColor', false, color);
+      }catch(e){
+        _wrapSelectionWithColor(color);
+      }
+    });
+  }
+}
+
+function _wrapSelectionWithTag(cmd){
+  const sel = document.getSelection(); if (!sel || sel.rangeCount===0) return;
+  const range = sel.getRangeAt(0);
+  const tagMap = { bold:'b', italic:'i', underline:'u' };
+  const tag = tagMap[cmd] || 'span';
+  try{
+    const el = document.createElement(tag);
+    range.surroundContents(el);
+    sel.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(el);
+    sel.addRange(newRange);
+  }catch(e){
+    console.warn('[wrapSelection] surroundContents failed:', e);
+  }
+}
+
+function _wrapSelectionWithColor(color){
+  const sel = document.getSelection(); if (!sel || sel.rangeCount===0) return;
+  const range = sel.getRangeAt(0);
+  try{
+    const el = document.createElement('span');
+    el.style.color = color;
+    range.surroundContents(el);
+    sel.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(el);
+    sel.addRange(newRange);
+  }catch(e){
+    // fallback: wrap by extracting contents
+    try{
+      const frag = range.cloneContents();
+      const wrapper = document.createElement('span'); wrapper.style.color = color;
+      wrapper.appendChild(frag);
+      range.deleteContents();
+      range.insertNode(wrapper);
+      sel.removeAllRanges();
+      const nr = document.createRange(); nr.selectNodeContents(wrapper); sel.addRange(nr);
+    }catch(err){
+      console.warn('[wrapSelectionColor] failed:', err);
+    }
+  }
+}
+
+function _posAndShowPlbar(range){
+  const bar = document.getElementById('wbp-plbar'); if(!bar) return;
+  const rect = range.getBoundingClientRect();
+  if (!rect || (rect.width===0 && rect.height===0)) return;
+  bar.removeAttribute('hidden');
+  // position relative to viewport + scroll
+  const left = rect.left + rect.width/2 + window.scrollX;
+  const top  = rect.top + window.scrollY;
+  bar.style.left = left + 'px';
+  bar.style.top  = top + 'px';
+}
+
+function _hidePlbar(){
+  const bar = document.getElementById('wbp-plbar'); if(!bar) return;
+  bar.setAttribute('hidden','');
+}
+
+function _selectionIsInOpenPara(){
+  const sel = document.getSelection(); if(!sel || sel.rangeCount===0) return null;
+  const range = sel.getRangeAt(0);
+  const node = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
+  if(!node) return null;
+  const pline = node.closest('.pline');
+  if(!pline) return null;
+  const para = pline.closest('details.para');
+  if(!para || !para.hasAttribute('open')) return null;
+  return { pline, para, range };
+}
+
+// selectionchange handler
+function _onSelectionChangeForPlbar(){
+  const ctx = _selectionIsInOpenPara();
+  if(!ctx) { _hidePlbar(); return; }
+  const sel = document.getSelection();
+  if (!sel || sel.isCollapsed) { _hidePlbar(); return; }
+  // show and position
+  _posAndShowPlbar(ctx.range);
+}
+
+// Init listeners (idempotent)
+function ensureFloatingSelectionToolbar(){
+  _ensureFloatingPlbar();
+  // avoid duplicate listeners by name-check
+  if (ensureFloatingSelectionToolbar._attached) return; ensureFloatingSelectionToolbar._attached = true;
+  document.addEventListener('selectionchange', ()=>{
+    // small timeout to let selection settle
+    setTimeout(_onSelectionChangeForPlbar, 10);
+  });
+  // hide when clicking outside
+  document.addEventListener('mousedown', (e)=>{
+    const bar = document.getElementById('wbp-plbar');
+    if (!bar) return;
+    if (e.target && (e.target.closest && e.target.closest('#wbp-plbar'))) return;
+    // allow clicks inside .pline to keep toolbar
+    if (e.target && e.target.closest && e.target.closest('.pline')) return;
+    _hidePlbar();
+  });
+}
+
+// 자동 초기화 시도
+try{ ensureFloatingSelectionToolbar(); }catch(e){ console.warn('floating toolbar init failed', e); }
+
+
 const AI_ENDPOINT = 'http://localhost:5174/api/unit-context';
 const el = id => document.getElementById(id);
 const treeEl = el('tree'), statusEl = el('status');
