@@ -1,27 +1,27 @@
-﻿/* --------- Utils --------- */
+/* --------- Utils --------- */
 
-// ===== [BOOK HEAD CHIPS] 媛?梨낆쓽 1??泥??⑤씫 '?ㅺ탳' ?ㅻⅨ履쎌뿉 移⑹뒪 二쇱엯 =====
+// ===== [BOOK HEAD CHIPS] 각 책의 1장 첫 단락 '설교' 오른쪽에 칩스 주입 =====
 
 function ensureBookHeadChips(){
   const doc = document;
 
-  // 1) 梨??몃뱶 李얘린
+  // 1) 책 노드 찾기
   const books = doc.querySelectorAll('#tree > details, details.book');
   if (!books.length) {
-    console.warn('[bookchips] 梨?details) ?놁쓬: #tree 援ъ“瑜??뺤씤?섏꽭??');
+    console.warn('[bookchips] 책(details) 없음: #tree 구조를 확인하세요.');
     return;
   }
 
   books.forEach((bookEl, bookIdx) => {
     try{
-      // 2) 1??+ 泥??⑤씫
+      // 2) 1장 + 첫 단락
       const ch1 = bookEl.querySelector(':scope > .chapters > details') || bookEl.querySelector('details');
       if (!ch1) return;
 
       const p1  = ch1.querySelector(':scope > .paras > details.para') || ch1.querySelector('details.para');
       if (!p1) return;
 
-      // 3) ?대컮 ?뺣낫
+      // 3) 툴바 확보
       let tb = p1.querySelector('.ptoolbar');
       if (!tb) {
         const body = p1.querySelector('.pbody') || p1;
@@ -30,35 +30,35 @@ function ensureBookHeadChips(){
         body.insertAdjacentElement('afterbegin', tb);
       }
 
-      // 4) ?ㅺ탳 踰꾪듉 ?뺣낫
+      // 4) 설교 버튼 확보
       let sermBtn = tb.querySelector('.sermBtn');
       if (!sermBtn) {
         sermBtn = doc.createElement('button');
         sermBtn.className = 'sermBtn';
-        sermBtn.textContent = '?ㅺ탳紐⑸줉';
+        sermBtn.textContent = '설교목록';
         tb.appendChild(sermBtn);
       }
 
-      // 5) 湲곗〈 移⑹뒪 ?쒓굅
+      // 5) 기존 칩스 제거
       tb.querySelectorAll('.bookhead-chips').forEach(n => n.remove());
 
-      // 6) 移⑹뒪 ?앹꽦 ???ㅺ탳 ?ㅻⅨ履쎌뿉 ?쎌엯
+      // 6) 칩스 생성 후 설교 오른쪽에 삽입
       const chips = doc.createElement('span');
       chips.className = 'bookhead-chips';
       chips.innerHTML = `
-        <button type="button" class="book-chip" data-type="basic">湲곕낯?댄빐</button>
-        <button type="button" class="book-chip" data-type="structure">?댁슜援ъ“</button>
-        <button type="button" class="book-chip" data-type="summary">硫붿꽭吏?붿빟</button>
+        <button type="button" class="book-chip" data-type="basic">기본이해</button>
+        <button type="button" class="book-chip" data-type="structure">내용구조</button>
+        <button type="button" class="book-chip" data-type="summary">메세지요약</button>
       `;
 
       sermBtn.insertAdjacentElement('afterend', chips);
 
-      // ===== 湲곕낯?댄빐쨌?댁슜援ъ“쨌硫붿꽭吏?붿빟 ??"梨??⑥쐞" ?먮뵒???곌껐 =====
+      // ===== 기본이해·내용구조·메세지요약 → "책 단위" 에디터 연결 =====
       const chipBasic   = chips.querySelector('button[data-type="basic"]');
       const chipStruct  = chips.querySelector('button[data-type="structure"]');
       const chipSummary = chips.querySelector('button[data-type="summary"]');
 
-      // ???⑤씫??梨??뺣낫留??ъ슜 (chap/paraIdx???ш린?????)
+      // 이 단락의 책 정보만 사용 (chap/paraIdx는 여기선 안 씀)
       const summaryEl = p1.querySelector(':scope > summary .ptitle');
       if (!summaryEl) return;
 
@@ -66,7 +66,7 @@ function ensureBookHeadChips(){
       if (!book) return;
 
       const openBookChipEditor = (mode) => {
-        openBookDocEditor(mode, book); // ?뙚 ?덈줈 留뚮뱺 梨??⑥쐞 ?먮뵒??
+        openBookDocEditor(mode, book); // 🌟 새로 만든 책 단위 에디터
       };
 
       if (chipBasic)
@@ -79,38 +79,38 @@ function ensureBookHeadChips(){
         chipSummary.onclick = () => openBookChipEditor('summary');
 
     } catch(err){
-      console.warn('[bookchips] 泥섎━ 以??ㅻ쪟:', err);
+      console.warn('[bookchips] 처리 중 오류:', err);
     }
   });
 }
 
 window.ensureBookHeadChips = ensureBookHeadChips;
 
-// ===== [GLOBAL BOOK CHIPS] ?ㅻ뜑??'?쒖떇媛?몄삤湲? ?ㅻⅨ履쎌뿉 ?꾩뿭 移⑹뒪 =====
-// ===== [GLOBAL BOOK CHIPS] '?쒖떇媛?몄삤湲? ?ㅻⅨ履?移⑹뒪 二쇱엯 =====
+// ===== [GLOBAL BOOK CHIPS] 헤더의 '서식가져오기' 오른쪽에 전역 칩스 =====
+// ===== [GLOBAL BOOK CHIPS] '서식가져오기' 오른쪽 칩스 주입 =====
 function ensureGlobalBookChips(){
   const doc = document;
 
-  // 湲곗?: "?쒖떇媛?몄삤湲? 踰꾪듉 李얘린
+  // 기준: "서식가져오기" 버튼 찾기
   const anchor =
     doc.getElementById('btnFmtLoad') ||
-    Array.from(doc.querySelectorAll('button')).find(b => (b.textContent||'').includes('?쒖떇媛?몄삤湲?));
+    Array.from(doc.querySelectorAll('button')).find(b => (b.textContent||'').includes('서식가져오기'));
   if(!anchor) return;
 
-  // ?대? ?덉쑝硫??щ같移섎쭔
+  // 이미 있으면 재배치만
   let wrap = doc.getElementById('globalBookChips');
   if(!wrap){
     wrap = doc.createElement('span');
     wrap.id = 'globalBookChips';
     wrap.innerHTML = `
-      <button type="button" class="book-chip" data-type="basic">湲곕낯?댄빐</button>
-      <button type="button" class="book-chip" data-type="structure">?댁슜援ъ“</button>
-      <button type="button" class="book-chip" data-type="summary">硫붿꽭吏?붿빟</button>
+      <button type="button" class="book-chip" data-type="basic">기본이해</button>
+      <button type="button" class="book-chip" data-type="structure">내용구조</button>
+      <button type="button" class="book-chip" data-type="summary">메세지요약</button>
     `;
     anchor.insertAdjacentElement('afterend', wrap);
 
-    // ?대┃ ???꾩옱 ?대┛ "梨?summary)" 湲곗? 梨??⑥쐞 ?먮뵒???ㅽ뻾
-    // ?대깽??由ъ뒪??以묐났 ?깅줉 諛⑹? ?뚮옒洹?
+    // 클릭 → 현재 열린 "책(summary)" 기준 책 단위 에디터 실행
+    // 이벤트 리스너 중복 등록 방지 플래그
     if (!wrap.dataset.listenerAttached) {
       wrap.dataset.listenerAttached = 'true';
       wrap.addEventListener('click', (e)=>{
@@ -118,30 +118,30 @@ function ensureGlobalBookChips(){
       if(!btn) return;
       e.stopPropagation();
 
-      // ??梨?summary瑜??좎뿰?섍쾶 李얜뒗 ?ы띁
+      // ✅ 책 summary를 유연하게 찾는 헬퍼
       const getCurrentBookSummary = () => {
-        // 1) ?꾩옱 ?대┛ ?⑤씫???덉쑝硫?洹??⑤씫???랁븳 梨?
+        // 1) 현재 열린 단락이 있으면 그 단락이 속한 책
         const openPara = document.querySelector('details.para[open]');
         if (openPara) {
           const bookEl = openPara.closest('details.book');
           if (bookEl) {
-            // ?대? ?대젮?덉? ?딆쓣 ?뚮쭔 ?닿린 (臾댄븳 猷⑦봽 諛⑹?)
+            // 이미 열려있지 않을 때만 열기 (무한 루프 방지)
             if (!bookEl.hasAttribute('open')) {
               try {
                 bookEl.setAttribute('open','');
               } catch(e) {
-                console.warn('[ensureGlobalBookChips] 梨??닿린 ?ㅽ뙣:', e);
+                console.warn('[ensureGlobalBookChips] 책 열기 실패:', e);
               }
             }
             const sum = bookEl.querySelector(':scope > summary');
             if (sum) return sum;
           }
         }
-        // 2) ?대? ?대젮 ?덈뒗 梨?
+        // 2) 이미 열려 있는 책
         const opened = document.querySelector('details.book[open] > summary');
         if (opened) return opened;
 
-        // 3) ?꾨Т 梨낅룄 ???대젮 ?덉쑝硫?泥?踰덉㎏ 梨낆쓣 ?먮룞?쇰줈 ?닿린
+        // 3) 아무 책도 안 열려 있으면 첫 번째 책을 자동으로 열기
         const first = document.querySelector('details.book > summary');
         if (first) {
           const bookEl = first.parentElement;
@@ -149,7 +149,7 @@ function ensureGlobalBookChips(){
             try {
               bookEl.setAttribute('open','');
             } catch(e) {
-              console.warn('[ensureGlobalBookChips] 泥?梨??닿린 ?ㅽ뙣:', e);
+              console.warn('[ensureGlobalBookChips] 첫 책 열기 실패:', e);
             }
           }
           return first;
@@ -159,19 +159,19 @@ function ensureGlobalBookChips(){
 
       const bookSummary = getCurrentBookSummary();
       if (!bookSummary) {
-        alert('?깃꼍(梨???李얠? 紐삵뻽?듬땲?? ?몃━媛 ?뚮뜑留곷릺?덈뒗吏 ?뺤씤?섏꽭??');
+        alert('성경(책)을 찾지 못했습니다. 트리가 렌더링되었는지 확인하세요.');
         return;
       }
 
-      // 梨??대쫫 異붿텧
+      // 책 이름 추출
       const btitle = bookSummary.querySelector('.btitle');
       const bookName = btitle?.dataset?.book || bookSummary.dataset?.book || (btitle?.textContent || bookSummary.textContent || '').trim();
       if (!bookName) {
-        alert('梨??대쫫??李얠쓣 ???놁뒿?덈떎.');
+        alert('책 이름을 찾을 수 없습니다.');
         return;
       }
 
-      // 踰꾪듉??data-type??openBookDocEditor??mode濡?留ㅽ븨
+      // 버튼의 data-type을 openBookDocEditor의 mode로 매핑
       const typeMap = {
         'basic': 'basic',
         'structure': 'struct',
@@ -182,38 +182,38 @@ function ensureGlobalBookChips(){
       if (typeof openBookDocEditor === 'function') {
         openBookDocEditor(mode, bookName);
       } else {
-        alert('openBookDocEditor ?⑥닔媛 ?놁뒿?덈떎.');
+        alert('openBookDocEditor 함수가 없습니다.');
       }
       });
-    } // if (!wrap.dataset.listenerAttached) ?リ린
+    } // if (!wrap.dataset.listenerAttached) 닫기
 
   }
 
-  // ??긽 '?쒖떇媛?몄삤湲? ?ㅻⅨ履쎌뿉 ?꾩튂 蹂댁젙
+  // 항상 '서식가져오기' 오른쪽에 위치 보정
   if (wrap.previousElementSibling !== anchor){
     anchor.insertAdjacentElement('afterend', wrap);
   }
 }
 
-// 肄섏넄?먯꽌???몄텧 媛??
+// 콘솔에서도 호출 가능
 window.ensureGlobalBookChips = ensureGlobalBookChips;
 
-// ===== [BOOK-UNIT EDITOR] ?깃꼍(梨? ?⑥쐞 ?먮뵒??& 移⑹뒪 =====
+// ===== [BOOK-UNIT EDITOR] 성경(책) 단위 에디터 & 칩스 =====
 const BOOK_UNIT_NS = 'WBP3_BOOKUNIT';
 
-// 梨????앹꽦: data-book ?곗꽑, ?놁쑝硫??쒕ぉ ?띿뒪???ъ슜
+// 책 키 생성: data-book 우선, 없으면 제목 텍스트 사용
 function _bookKeyFromSummary(sumEl, type){
   if (!sumEl) return null;
   const btitle = sumEl.querySelector('.btitle');
   const dataBook = btitle?.dataset?.book || sumEl.dataset?.book;
   let bookId = dataBook || (btitle?.textContent || sumEl.textContent || '').trim();
   if (!bookId) return null;
-  // 怨듬갚 ?뺣━
+  // 공백 정리
   bookId = bookId.replace(/\s+/g,' ');
   return `${BOOK_UNIT_NS}:${bookId}:${type}`;
 }
 
-// 湲곗〈 ?⑥쐞 ?먮뵒???앹뾽???ъ궗??(?놁쑝硫??앹꽦)
+// 기존 단위 에디터 팝업을 재사용 (없으면 생성)
 function _ensureBookUnitEditorHost(){
   let host = document.getElementById('unitEditor');
   if (host) return host;
@@ -222,23 +222,23 @@ function _ensureBookUnitEditorHost(){
   host.className = 'unit-editor';
   host.innerHTML = `
     <header>
-      <div class="ue-title">?⑥쐞 ?먮뵒??/div>
+      <div class="ue-title">단위 에디터</div>
       <div class="ue-actions">
-        <button type="button" id="ueSave">???/button>
-        <button type="button" id="ueClose">?リ린</button>
+        <button type="button" id="ueSave">저장</button>
+        <button type="button" id="ueClose">닫기</button>
       </div>
     </header>
-    <textarea id="ueText" placeholder="?ш린???댁슜???낅젰?섏꽭?? (?먮룞???"></textarea>
+    <textarea id="ueText" placeholder="여기에 내용을 입력하세요. (자동저장)"></textarea>
   `;
   document.body.appendChild(host);
-  // ?リ린
+  // 닫기
   host.querySelector('#ueClose').addEventListener('click', ()=> { host.style.display = 'none'; });
-  // ?섎룞 ???
+  // 수동 저장
   host.querySelector('#ueSave').addEventListener('click', ()=>{
     const key = host.dataset.key;
     if (key) saveState(key, host.querySelector('#ueText').value || '');
   });
-  // ?먮룞 ????붾컮?댁뒪)
+  // 자동 저장(디바운스)
   let _tm = null;
   host.querySelector('#ueText').addEventListener('input', ()=>{
     clearTimeout(_tm);
@@ -250,30 +250,30 @@ function _ensureBookUnitEditorHost(){
   return host;
 }
 
-// 梨??⑥쐞 ?먮뵒???닿린
+// 책 단위 에디터 열기
 function openBookEditor(type, sumEl){
   const sum = sumEl || document.querySelector('details.book[open] > summary');
-  if (!sum) { alert('?대┛ ?깃꼍(梨???李얠쓣 ???놁뒿?덈떎. 梨?summary瑜?癒쇱? ?ъ꽭??'); return; }
+  if (!sum) { alert('열린 성경(책)을 찾을 수 없습니다. 책 summary를 먼저 여세요.'); return; }
 
   const key = _bookKeyFromSummary(sum, type);
-  if (!key) { alert('梨????앹꽦 ?ㅽ뙣: .btitle data-book ?먮뒗 ?띿뒪???뺤씤'); return; }
+  if (!key) { alert('책 키 생성 실패: .btitle data-book 또는 텍스트 확인'); return; }
 
   const host = _ensureBookUnitEditorHost();
-  const label = (type === 'basic') ? '湲곕낯?댄빐' : (type === 'structure' ? '?댁슜援ъ“' : '硫붿꽭吏?붿빟');
+  const label = (type === 'basic') ? '기본이해' : (type === 'structure' ? '내용구조' : '메세지요약');
   host.dataset.key = key;
-  host.querySelector('.ue-title').textContent = `?⑥쐞 ?먮뵒????${label} (梨??⑥쐞)`;
+  host.querySelector('.ue-title').textContent = `단위 에디터 — ${label} (책 단위)`;
   host.querySelector('#ueText').value = loadState(key, '') || '';
   host.style.display = 'flex';
   host.querySelector('#ueText').focus();
 }
 
-// 梨?summary ??移⑹뒪 二쇱엯
+// 책 summary 옆 칩스 주입
 function ensureBookChips(){
   const books = document.querySelectorAll('details.book > summary');
   if (!books.length) return;
 
   books.forEach(sum => {
-    // btitle ?놁쑝硫??앹꽦(??踰덈쭔)
+    // btitle 없으면 생성(한 번만)
     let bt = sum.querySelector('.btitle');
     if (!bt) {
       bt = document.createElement('span');
@@ -284,29 +284,29 @@ function ensureBookChips(){
         first.nodeValue = '';
         sum.insertBefore(bt, sum.firstChild);
       } else {
-        // ?띿뒪?멸? ?놁쑝硫?鍮?btitle ?쎌엯
+        // 텍스트가 없으면 빈 btitle 삽입
         sum.insertBefore(bt, sum.firstChild);
       }
     }
 
-    // ?대? summary 諛붾줈 ?꾨옒??移⑹뒪媛 ?덈뒗吏 ?뺤씤
+    // 이미 summary 바로 아래에 칩스가 있는지 확인
     let chips = sum.querySelector(':scope > .book-chips');
     if (!chips) {
       chips = document.createElement('span');
       chips.className = 'book-chips';
       chips.innerHTML = `
-        <button type="button" class="book-chip" data-type="basic">湲곕낯?댄빐</button>
-        <button type="button" class="book-chip" data-type="structure">?댁슜援ъ“</button>
-        <button type="button" class="book-chip" data-type="summary">硫붿꽭吏?붿빟</button>
+        <button type="button" class="book-chip" data-type="basic">기본이해</button>
+        <button type="button" class="book-chip" data-type="structure">내용구조</button>
+        <button type="button" class="book-chip" data-type="summary">메세지요약</button>
       `;
       sum.insertBefore(chips, sum.firstChild);
 
-      // summary ?좉?濡??꾪뙆 李⑤떒 + ?대떦 梨?而⑦뀓?ㅽ듃濡??먮뵒???닿린
+      // summary 토글로 전파 차단 + 해당 책 컨텍스트로 에디터 열기
       chips.addEventListener('click', (e)=>{
         e.stopPropagation();
         const btn = e.target.closest('.book-chip'); if (!btn) return;
         const paraBook = sum.closest('details.book');
-        if (paraBook && !paraBook.hasAttribute('open')) paraBook.setAttribute('open',''); // 梨??닿린 蹂댁옣
+        if (paraBook && !paraBook.hasAttribute('open')) paraBook.setAttribute('open',''); // 책 열기 보장
         openBookEditor(btn.dataset.type, sum);
         e.preventDefault();
       });
@@ -314,14 +314,14 @@ function ensureBookChips(){
   });
 }
 
-// ?꾩뿭?먯꽌 肄섏넄濡쒕룄 ?몄텧 媛?ν븯寃??깅줉
+// 전역에서 콘솔로도 호출 가능하게 등록
 // window.ensureBookChips = ensureBookChips;
 
-// ===== [UNIT-EDITOR GLOBAL CHIPS] ?ㅻ뜑 ?곗륫 ?꾩뿭 移⑹뒪 ?앹꽦 (?꾩뿭 ?깅줉) BEGIN =====
+// ===== [UNIT-EDITOR GLOBAL CHIPS] 헤더 우측 전역 칩스 생성 (전역 등록) BEGIN =====
 function ensureUnitGlobalChips(){
   const doc = document;
 
-  // ?ㅻ뜑 ?뺣낫(?놁쑝硫??泥??ㅻ뜑 ?앹꽦)
+  // 헤더 확보(없으면 대체 헤더 생성)
   let header = doc.querySelector('header');
   if (!header) {
     header = doc.createElement('header');
@@ -334,23 +334,23 @@ function ensureUnitGlobalChips(){
     if (!cs.gap || cs.gap === '0px') header.style.gap = '8px';
   }
 
-  // 以묐났 ?앹꽦 諛⑹?
+  // 중복 생성 방지
   let bar = doc.getElementById('unitGlobalChips');
   if (!bar) {
     bar = doc.createElement('div');
     bar.id = 'unitGlobalChips';
     bar.innerHTML = `
-      <button type="button" class="unit-chip" data-type="basic">湲곕낯?댄빐</button>
-      <button type="button" class="unit-chip" data-type="structure">?댁슜援ъ“</button>
-      <button type="button" class="unit-chip" data-type="summary">硫붿꽭吏?붿빟</button>
+      <button type="button" class="unit-chip" data-type="basic">기본이해</button>
+      <button type="button" class="unit-chip" data-type="structure">내용구조</button>
+      <button type="button" class="unit-chip" data-type="summary">메세지요약</button>
     `;
     header.appendChild(bar);
 
-    // ?대┃: ?꾩옱 ?대┛ ?⑤씫 湲곗??쇰줈 ?먮뵒???닿린
+    // 클릭: 현재 열린 단락 기준으로 에디터 열기
     bar.addEventListener('click', (e)=>{
       const btn = e.target.closest('.unit-chip'); if(!btn) return;
       const open = document.querySelector('details.para[open]');
-      if(!open){ alert('?대┛ ?⑤씫???놁뒿?덈떎. ?⑤씫??癒쇱? ?ъ꽭??'); return; }
+      if(!open){ alert('열린 단락이 없습니다. 단락을 먼저 여세요.'); return; }
       if(!open.hasAttribute('open')) open.setAttribute('open','');
       openUnitEditor(btn.dataset.type);
       e.preventDefault();
@@ -358,7 +358,7 @@ function ensureUnitGlobalChips(){
     });
   }
 }
-// ?꾩뿭?먯꽌 肄섏넄 ?몄텧 媛?ν븯?꾨줉 ?몄텧
+// 전역에서 콘솔 호출 가능하도록 노출
 // window.ensureUnitGlobalChips = ensureUnitGlobalChips;
 // ===== [UNIT-EDITOR GLOBAL CHIPS] END =====
 
@@ -378,24 +378,24 @@ function _ensureUnitEditorHost(){
   host.className = 'unit-editor';
   host.innerHTML = `
     <header>
-      <div class="ue-title">?⑥쐞 ?먮뵒??/div>
+      <div class="ue-title">단위 에디터</div>
       <div class="ue-actions">
-        <button type="button" id="ueSave">???/button>
-        <button type="button" id="ueClose">?リ린</button>
+        <button type="button" id="ueSave">저장</button>
+        <button type="button" id="ueClose">닫기</button>
       </div>
     </header>
-    <textarea id="ueText" placeholder="?ш린???댁슜???낅젰?섏꽭?? (?먮룞???"></textarea>
+    <textarea id="ueText" placeholder="여기에 내용을 입력하세요. (자동저장)"></textarea>
   `;
   document.body.appendChild(host);
 
-  // ?リ린
+  // 닫기
   host.querySelector('#ueClose').addEventListener('click', ()=> { host.style.display='none'; });
-  // ???(?섎룞)
+  // 저장 (수동)
   host.querySelector('#ueSave').addEventListener('click', ()=>{
     const key = host.dataset.key;
     if (key) saveState(key, host.querySelector('#ueText').value || '');
   });
-  // ?먮룞???(?붾컮?댁뒪)
+  // 자동저장 (디바운스)
   let _tm = null;
   host.querySelector('#ueText').addEventListener('input', ()=>{
     clearTimeout(_tm);
@@ -411,23 +411,23 @@ function _ensureUnitEditorHost(){
 function openUnitEditor(type){
   const open = document.querySelector('details.para[open]');
   const t = open?.querySelector('summary .ptitle');
-  if(!t){ alert('?대┛ ?⑤씫??李얠쓣 ???놁뒿?덈떎.'); return; }
+  if(!t){ alert('열린 단락을 찾을 수 없습니다.'); return; }
 
   const key = _unitKeyFromTitleEl(t, type);
-  if(!key){ alert('???앹꽦 ?ㅻ쪟: data-book/ch/idx ?뺤씤'); return; }
+  if(!key){ alert('키 생성 오류: data-book/ch/idx 확인'); return; }
 
   const host = _ensureUnitEditorHost();
-  const label = type === 'basic' ? '湲곕낯?댄빐' : (type === 'structure' ? '?댁슜援ъ“' : '硫붿꽭吏?붿빟');
+  const label = type === 'basic' ? '기본이해' : (type === 'structure' ? '내용구조' : '메세지요약');
 
   host.dataset.key = key;
-  host.querySelector('.ue-title').textContent = `?⑥쐞 ?먮뵒????${label}`;
+  host.querySelector('.ue-title').textContent = `단위 에디터 — ${label}`;
   host.querySelector('#ueText').value = loadState(key, '') || '';
   host.style.display = 'flex';
   host.querySelector('#ueText').focus();
 }
 
-// ===== [FORMAT-PERSIST BACKUP] ?대낫?닿린/媛?몄삤湲??좏떥 (WBP3_FMT) BEGIN =====
-// const FMT_NS = typeof FMT_NS === 'string' ? FMT_NS : 'WBP3_FMT'; // ?대? ?덉쑝硫??ъ궗??
+// ===== [FORMAT-PERSIST BACKUP] 내보내기/가져오기 유틸 (WBP3_FMT) BEGIN =====
+// const FMT_NS = typeof FMT_NS === 'string' ? FMT_NS : 'WBP3_FMT'; // 이미 있으면 재사용
 
 function wbpExportFormats(){
   try{
@@ -447,10 +447,10 @@ function wbpExportFormats(){
     const fname = `wbp-format-backup-${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}.json`;
     a.href = url; a.download = fname; document.body.appendChild(a); a.click();
     setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
-    if (typeof status === 'function') status(`?쒖떇 ?대낫?닿린 ?꾨즺 (${items.length}媛?`);
+    if (typeof status === 'function') status(`서식 내보내기 완료 (${items.length}개)`);
   }catch(e){
     console.error(e);
-    alert('?쒖떇 ?대낫?닿린 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.');
+    alert('서식 내보내기 중 오류가 발생했습니다.');
   }
 }
 
@@ -465,21 +465,21 @@ function wbpImportFormatsFromFile(){
     reader.onload = () => {
       try{
         const json = JSON.parse(String(reader.result||'{}'));
-        // ?덉슜 ?щ㎎: {ns, exportedAt, items:[{key,value}]} ?먮뒗 { "<key>": <value>, ... }
+        // 허용 포맷: {ns, exportedAt, items:[{key,value}]} 또는 { "<key>": <value>, ... }
         let kvList = [];
         if (Array.isArray(json.items)) {
           kvList = json.items;
         } else {
           kvList = Object.keys(json).map(k => ({ key: k, value: json[k] }));
         }
-        // ?ㅼ엫?ㅽ럹?댁뒪 ?ㅻ쭔 諛섏쁺
+        // 네임스페이스 키만 반영
         const onlyFmt = kvList.filter(rec => typeof rec.key === 'string' && rec.key.startsWith(FMT_NS + ':'));
         if (onlyFmt.length === 0) {
-          alert('媛?몄삱 WBP ?쒖떇 ?ㅻ? 李얠? 紐삵뻽?듬땲??');
+          alert('가져올 WBP 서식 키를 찾지 못했습니다.');
           return;
         }
-        // ??뼱?곌린 ?뺤씤
-        const overwrite = confirm(`${onlyFmt.length}媛쒖쓽 ?쒖떇 ?곗씠?곕? 媛?몄샃?덈떎.\n?숈씪 ?ㅻ뒗 ??뼱?곌린 ?⑸땲?? 怨꾩냽?좉퉴??`);
+        // 덮어쓰기 확인
+        const overwrite = confirm(`${onlyFmt.length}개의 서식 데이터를 가져옵니다.\n동일 키는 덮어쓰기 됩니다. 계속할까요?`);
         if(!overwrite) return;
 
         let applied = 0;
@@ -491,20 +491,20 @@ function wbpImportFormatsFromFile(){
             console.warn('skip:', rec.key, e);
           }
         }
-        if (typeof status === 'function') status(`?쒖떇 媛?몄삤湲??꾨즺 (${applied}媛??곸슜)`);
-        alert(`媛?몄삤湲??꾨즺: ${applied}媛??곸슜`);
+        if (typeof status === 'function') status(`서식 가져오기 완료 (${applied}개 적용)`);
+        alert(`가져오기 완료: ${applied}개 적용`);
       }catch(e){
         console.error(e);
-        alert('?쒖떇 媛?몄삤湲?以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎. JSON ?뺤떇???뺤씤?섏꽭??');
+        alert('서식 가져오기 중 오류가 발생했습니다. JSON 형식을 확인하세요.');
       }
     };
     reader.readAsText(file);
   };
   input.click();
 }
-// ===== [FORMAT-PERSIST BACKUP] ?대낫?닿린/媛?몄삤湲??좏떥 (WBP3_FMT) END =====
+// ===== [FORMAT-PERSIST BACKUP] 내보내기/가져오기 유틸 (WBP3_FMT) END =====
 
-// ===== [FORMAT-PERSIST/RUNS] ?꾩튂?뺣낫(?ㅽ봽?? 異붿텧 諛?HTML ?ш뎄???좏떥 BEGIN =====
+// ===== [FORMAT-PERSIST/RUNS] 위치정보(오프셋) 추출 및 HTML 재구성 유틸 BEGIN =====
 function _collectTextAndRuns(rootEl){
   const spans = [];
   let text = '';
@@ -531,7 +531,7 @@ function _collectTextAndRuns(rootEl){
     if (node.nodeType === Node.TEXT_NODE) {
       const chunk = node.nodeValue || '';
       const start = offset;
-      const cps = [...chunk]; // ?좊땲肄붾뱶 ?덉쟾
+      const cps = [...chunk]; // 유니코드 안전
       text += chunk; offset += cps.length;
       for (const a of active) pushSpan(start, offset, a);
       return;
@@ -549,10 +549,10 @@ function _collectTextAndRuns(rootEl){
 }
 
 function _wrapRunsToHTML(text, spans){
-  // ?좊땲肄붾뱶 ?덉쟾 臾몄옄 諛곗뿴
+  // 유니코드 안전 문자 배열
   const cps = [...String(text||'')];
 
-  // ?꾩튂蹂??쒖옉/???몃뜳??留?
+  // 위치별 시작/끝 인덱스 맵
   const starts = new Map(), ends = new Map();
   (spans||[]).forEach(sp => {
     if (!starts.has(sp.start)) starts.set(sp.start, []);
@@ -561,7 +561,7 @@ function _wrapRunsToHTML(text, spans){
     ends.get(sp.end).push(sp);
   });
 
-  // ?쒓렇 ?닿린/?リ린
+  // 태그 열기/닫기
   function openTags(a){
     let out = '';
     if (a.b) out += '<b>';
@@ -583,12 +583,12 @@ function _wrapRunsToHTML(text, spans){
     return out;
   }
 
-  // ?꾩옱 ?쒖꽦 ?띿꽦 ?ㅽ깮(?⑥닚 蹂묓빀 ?꾨왂)
+  // 현재 활성 속성 스택(단순 병합 전략)
   const active = [];
   const out = [];
 
   for (let i=0;i<=cps.length;i++){
-    // 癒쇱? ?リ린
+    // 먼저 닫기
     if (ends.has(i)){
       if (active.length){
         const merged = active.reduce((m,a)=>Object.assign(m,a),{});
@@ -596,7 +596,7 @@ function _wrapRunsToHTML(text, spans){
         active.length = 0;
       }
     }
-    // 洹??ㅼ쓬 ?닿린
+    // 그 다음 열기
     if (starts.has(i)){
       const list = starts.get(i) || [];
       if (list.length){
@@ -614,7 +614,7 @@ function _wrapRunsToHTML(text, spans){
         out.push(openTags(merged));
       }
     }
-    // 蹂몃Ц 臾몄옄 異붽?
+    // 본문 문자 추가
     if (i < cps.length){
       const ch = cps[i]
         .replace(/&/g,'&amp;')
@@ -633,46 +633,46 @@ function _wrapRunsToHTML(text, spans){
 
 // ===== [FORMAT-PERSIST/RUNS] END =====
 
-// ===== [FORMAT-PERSIST] WBP-3.0 ?덈Ц???쒖떇 ???蹂듭썝 (localStorage, v2 runs) BEGIN =====
+// ===== [FORMAT-PERSIST] WBP-3.0 절문장 서식 저장/복원 (localStorage, v2 runs) BEGIN =====
 
-// ---- (ADD) ?꾩옱 ?대┛ ?⑤씫 ?쒖떇珥덇린??----
+// ---- (ADD) 현재 열린 단락 서식초기화 ----
 function clearFormatForOpenPara(){
-  // 1) ?꾩옱 ?대┛ ?⑤씫 而⑦뀓?ㅽ듃
+  // 1) 현재 열린 단락 컨텍스트
   const ctx = (typeof getOpenParaKeyAndEls === 'function') ? getOpenParaKeyAndEls() : null;
-  if(!ctx){ alert('?대젮?덈뒗 ?⑤씫??李얠쓣 ???놁뒿?덈떎.'); return; }
+  if(!ctx){ alert('열려있는 단락을 찾을 수 없습니다.'); return; }
 
-  // 2) localStorage ??λ낯 ??젣 (洹??⑤씫留?
+  // 2) localStorage 저장본 삭제 (그 단락만)
   try{
     localStorage.removeItem(ctx.key);
   }catch(e){
-    console.warn('localStorage remove ?ㅽ뙣:', e);
+    console.warn('localStorage remove 실패:', e);
   }
 
-  // 3) ?붾㈃???몃씪???쒖떇 ?쒓굅 (.pline .content ?곗꽑)
-  const SKIP_SELECTOR = 'sup, sup.pv, .pv, .pvnum, .verse-no'; // ?덈쾲???깆? 嫄대뱶由ъ? ?딆쓬
+  // 3) 화면의 인라인 서식 제거 (.pline .content 우선)
+  const SKIP_SELECTOR = 'sup, sup.pv, .pv, .pvnum, .verse-no'; // 절번호 등은 건드리지 않음
   const isEmptyStyle = (el) => !el.getAttribute('style') || el.getAttribute('style').trim()==='';
 
   const stripInlineFormat = (root)=>{
     if(!root) return;
-    // 援듦쾶/湲곗슱??諛묒쨪/痍⑥냼??mark/font ???몃옪 (?쒓렇 ?쒓굅, ?띿뒪?몃쭔 ?④?)
+    // 굵게/기울임/밑줄/취소선/mark/font → 언랩 (태그 제거, 텍스트만 남김)
     root.querySelectorAll('b,i,u,s,mark,font').forEach(el=>{
       if (el.matches(SKIP_SELECTOR)) return;
       const frag = document.createDocumentFragment();
       while(el.firstChild) frag.appendChild(el.firstChild);
       el.replaceWith(frag);
     });
-    // span????諛곌꼍???쒓굅. ?몃え?놁뼱吏硫??몃옪
+    // span의 색/배경색 제거. 쓸모없어지면 언랩
     root.querySelectorAll('span').forEach(el=>{
       if (el.matches(SKIP_SELECTOR)) return;
       const style = el.getAttribute('style') || '';
-      // ??愿???띿꽦 鍮꾩슦湲?
+      // 색 관련 속성 비우기
       el.style && (el.style.color = '', el.style.backgroundColor = '');
-      // color/background留??덉뿀??寃쎌슦 style 鍮꾩슦湲?
+      // color/background만 있었던 경우 style 비우기
       if (style) {
         const s = el.getAttribute('style') || '';
         if (!s || s.trim()==='') el.removeAttribute('style');
       }
-      // ?대옒???곗씠???꾩씠????硫뷀?媛 ?녾퀬 style???놁쑝硫??몃옪
+      // 클래스/데이터/아이디 등 메타가 없고 style도 없으면 언랩
       if (!el.classList.length && !el.attributes.length) {
         const frag = document.createDocumentFragment();
         while(el.firstChild) frag.appendChild(el.firstChild);
@@ -681,20 +681,20 @@ function clearFormatForOpenPara(){
     });
   };
 
-  // 媛??덈Ц?μ뿉 ?곸슜
+  // 각 절문장에 적용
   for (const lineEl of ctx.lineEls){
     const root = lineEl.matches('.content') ? lineEl : (lineEl.querySelector('.content') || lineEl);
     stripInlineFormat(root);
   }
 
-  // 4) ?곹깭 ?쒖떆
-  if (typeof status === 'function') status('?쒖떇珥덇린???꾨즺 (?대떦 ?⑤씫留?');
+  // 4) 상태 표시
+  if (typeof status === 'function') status('서식초기화 완료 (해당 단락만)');
 }
 
-// FMT_NS???꾩そ(????쒖뒪???뱀뀡)?먯꽌 ?뺤쓽??
+// FMT_NS는 위쪽(저장 시스템 섹션)에서 정의됨
 
 function getOpenParaKeyAndEls(){
-  // ?꾩옱 ?대젮?덈뒗 ?⑤씫(details.para[open])怨???援ъ꽦
+  // 현재 열려있는 단락(details.para[open])과 키 구성
   const openPara = document.querySelector('details.para[open]');
   if(!openPara) return null;
 
@@ -706,7 +706,7 @@ function getOpenParaKeyAndEls(){
   const idx  = t.dataset.idx;
   if(!book || !ch || !idx) return null;
 
-  // ?덈Ц???쇱씤) ?섎━癒쇳듃 ?섏쭛: .pline .content ?곗꽑, ?놁쑝硫?.pline ?먯껜
+  // 절문장(라인) 엘리먼트 수집: .pline .content 우선, 없으면 .pline 자체
   const candidates = openPara.querySelectorAll('.pline .content, .pline');
   const lineEls = Array.from(candidates).filter(el => !el.matches('details, summary'));
 
@@ -716,7 +716,7 @@ function getOpenParaKeyAndEls(){
 
 function saveFormatForOpenPara(){
   const ctx = getOpenParaKeyAndEls();
-  if(!ctx){ alert('?대젮?덈뒗 ?⑤씫??李얠쓣 ???놁뒿?덈떎.'); return; }
+  if(!ctx){ alert('열려있는 단락을 찾을 수 없습니다.'); return; }
 
   const lines = ctx.lineEls.map(el => {
     const root = el.matches('.content') ? el : (el.querySelector('.content') || el);
@@ -727,20 +727,20 @@ function saveFormatForOpenPara(){
   const payload = { v: 2, savedAt: Date.now(), lines };
   try{
     saveState(ctx.key, payload);
-    status && status('?쒖떇 ????꾨즺 (?뺣?: ?꾩튂?뺣낫 ?ы븿)');
+    status && status('서식 저장 완료 (정밀: 위치정보 포함)');
   }catch(e){
     console.error(e);
-    alert('?쒖떇 ???以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.');
+    alert('서식 저장 중 오류가 발생했습니다.');
   }
 }
 
 function restoreFormatForOpenPara(){
   const ctx = getOpenParaKeyAndEls();
-  if(!ctx){ alert('?대젮?덈뒗 ?⑤씫??李얠쓣 ???놁뒿?덈떎.'); return; }
+  if(!ctx){ alert('열려있는 단락을 찾을 수 없습니다.'); return; }
 
   const data = loadState(ctx.key, null);
-  if(!data){ alert('??λ맂 ?쒖떇???놁뒿?덈떎. 癒쇱? [?쒖떇??????ㅽ뻾?섏꽭??'); return; }
-  if(!data || !Array.isArray(data.lines)){ alert('??λ맂 ?쒖떇 ?뺤떇???щ컮瑜댁? ?딆뒿?덈떎.'); return; }
+  if(!data){ alert('저장된 서식이 없습니다. 먼저 [서식저장]을 실행하세요.'); return; }
+  if(!data || !Array.isArray(data.lines)){ alert('저장된 서식 형식이 올바르지 않습니다.'); return; }
 
   const n = Math.min(ctx.lineEls.length, data.lines.length);
   for (let i=0; i<n; i++){
@@ -748,40 +748,40 @@ function restoreFormatForOpenPara(){
     const root = el.matches('.content') ? el : (el.querySelector('.content') || el);
     const rec = data.lines[i] || {};
     if (rec.text && Array.isArray(rec.spans)){
-      // runs 湲곕컲 蹂듭썝
+      // runs 기반 복원
       root.innerHTML = _wrapRunsToHTML(rec.text, rec.spans);
     } else if (rec.html){
-      // 援ы삎 ??λ낯 ?명솚
+      // 구형 저장본 호환
       root.innerHTML = rec.html;
     }
   }
-  status && status('?쒖떇 ?뚮났 ?꾨즺 (runs 湲곕컲)');
+  status && status('서식 회복 완료 (runs 기반)');
 }
 
-// ===== [FORMAT-PERSIST] WBP-3.0 ?덈Ц???쒖떇 ???蹂듭썝 (localStorage, v2 runs) END =====
+// ===== [FORMAT-PERSIST] WBP-3.0 절문장 서식 저장/복원 (localStorage, v2 runs) END =====
 
-// ===== [FORMAT-PERSIST UI] 踰꾪듉 ?앹꽦/諛붿씤??BEGIN =====
-// === [FORMAT-PERSIST UI] 踰꾪듉 ?앹꽦/諛곗튂 ???ㅻ뜑(?댁슜媛?몄삤湲???濡??대룞 ===
+// ===== [FORMAT-PERSIST UI] 버튼 생성/바인딩 BEGIN =====
+// === [FORMAT-PERSIST UI] 버튼 생성/배치 — 헤더(내용가져오기 옆)로 이동 ===
 function ensureFormatButtons(){
   const doc = document;
 
-  // 0) ?듭빱: ?ㅻ뜑??"?댁슜媛?몄삤湲? 踰꾪듉(湲곗〈 id: btnImportAll) ?곗꽑 ?먯깋
+  // 0) 앵커: 헤더의 "내용가져오기" 버튼(기존 id: btnImportAll) 우선 탐색
   let anchor =
     doc.getElementById('btnImportAll') ||
-    Array.from(doc.querySelectorAll('header button')).find(b => (b.textContent||'').trim().includes('?댁슜媛?몄삤湲?)) ||
+    Array.from(doc.querySelectorAll('header button')).find(b => (b.textContent||'').trim().includes('내용가져오기')) ||
     null;
 
-  // 1) ?몄뒪?? ?ㅻ뜑 ?곗꽑
+  // 1) 호스트: 헤더 우선
   const headerEl = doc.querySelector('header');
   const host = (anchor && anchor.parentElement) || headerEl || doc.body;
 
-  // 2) 以묐났 寃??
+  // 2) 중복 검사
   const existSave = doc.getElementById('btnFmtSave');
   const existLoad = doc.getElementById('btnFmtLoad');
   const existExp  = doc.getElementById('btnFmtExport');
   const existImp  = doc.getElementById('btnFmtImport');
 
-  // 3) ?앹꽦 ?좏떥
+  // 3) 생성 유틸
   const mkBtn = (id, label) => {
     const b = doc.createElement('button');
     b.id = id;
@@ -792,15 +792,15 @@ function ensureFormatButtons(){
     return b;
   };
 
-  const btnSave = existSave || mkBtn('btnFmtSave','?쒖떇???);
-  const btnLoad = existLoad || mkBtn('btnFmtLoad','?쒖떇?뚮났');
-  const btnExp  = existExp  || mkBtn('btnFmtExport','?쒖떇?대낫?닿린');
-  const btnImp  = existImp  || mkBtn('btnFmtImport','?쒖떇媛?몄삤湲?);
+  const btnSave = existSave || mkBtn('btnFmtSave','서식저장');
+  const btnLoad = existLoad || mkBtn('btnFmtLoad','서식회복');
+  const btnExp  = existExp  || mkBtn('btnFmtExport','서식내보내기');
+  const btnImp  = existImp  || mkBtn('btnFmtImport','서식가져오기');
 
-  // 4) 諛곗튂: "?댁슜媛?몄삤湲? 踰꾪듉???ㅻⅨ履쎌뿉 ?쒖꽌?濡?遺숈씠湲?
-  //    [?댁슜媛?몄삤湲? [?쒖떇媛?몄삤湲? [?쒖떇?대낫?닿린] [?쒖떇?뚮났] [?쒖떇???
+  // 4) 배치: "내용가져오기" 버튼의 오른쪽에 순서대로 붙이기
+  //    [내용가져오기] [서식가져오기] [서식내보내기] [서식회복] [서식저장]
   if (anchor) {
-    // ?대? ?덉쑝硫??ъ젙?щ쭔
+    // 이미 있으면 재정렬만
     anchor.insertAdjacentElement('afterend', btnSave);
     anchor.insertAdjacentElement('afterend', btnLoad);
     anchor.insertAdjacentElement('afterend', btnExp);
@@ -809,7 +809,7 @@ function ensureFormatButtons(){
     host.append(btnImp, btnExp, btnLoad, btnSave);
   }
 
-  // 5) ?대┃ ?대깽??湲곗〈 ?몃뱾???ъ궗??
+  // 5) 클릭 이벤트(기존 핸들러 재사용)
   btnSave.onclick = saveFormatForOpenPara;
   btnLoad.onclick = restoreFormatForOpenPara;
   btnExp.onclick  = wbpExportFormats;
@@ -819,14 +819,14 @@ function ensureFormatButtons(){
 function safeBindFmtButtons(){
   try{ ensureFormatButtons(); }
   catch(e){ console.error('ensureFormatButtons error:', e); }
-  // 踰꾪듉 ?됱긽 ?낅뜲?댄듃
+  // 버튼 색상 업데이트
   updateButtonColors();
 }
 
-/* ??踰꾪듉 ?됱긽 ?낅뜲?댄듃 (??λ맂 ?곗씠?곌? ?덉쑝硫??됯퉼 ?쒖떆) */
+/* ✅ 버튼 색상 업데이트 (저장된 데이터가 있으면 색깔 표시) */
 function updateButtonColors(){
   try {
-    // 1. ?댁슜?대낫?닿린 踰꾪듉 - ??λ맂 ?곗씠?곌? ?덈뒗吏 ?뺤씤
+    // 1. 내용내보내기 버튼 - 저장된 데이터가 있는지 확인
     const btnExportAll = document.getElementById('btnExportAll');
     if (btnExportAll) {
       const hasContent = hasStoredContent();
@@ -841,7 +841,7 @@ function updateButtonColors(){
       }
     }
     
-    // 2. ?쒖떇?대낫?닿린 踰꾪듉 - ??λ맂 ?쒖떇???덈뒗吏 ?뺤씤
+    // 2. 서식내보내기 버튼 - 저장된 서식이 있는지 확인
     const btnFmtExport = document.getElementById('btnFmtExport');
     if (btnFmtExport) {
       const hasFormat = hasStoredFormat();
@@ -856,7 +856,7 @@ function updateButtonColors(){
       }
     }
     
-    // 3. ?쒖떇???踰꾪듉 - ??λ맂 ?쒖떇???덈뒗吏 ?뺤씤
+    // 3. 서식저장 버튼 - 저장된 서식이 있는지 확인
     const btnFmtSave = document.getElementById('btnFmtSave');
     if (btnFmtSave) {
       const hasFormat = hasStoredFormat();
@@ -871,21 +871,21 @@ function updateButtonColors(){
       }
     }
   } catch (e) {
-    console.error('[updateButtonColors] ?ㅻ쪟:', e);
+    console.error('[updateButtonColors] 오류:', e);
   }
 }
 
-/* ????λ맂 ?댁슜 ?곗씠???뺤씤 */
+/* ✅ 저장된 내용 데이터 확인 */
 function hasStoredContent(){
   try {
     const keys = [STORAGE_SERMON, STORAGE_UNIT_CTX, STORAGE_WHOLE_CTX, STORAGE_COMMENTARY, STORAGE_SUMMARY];
     for (const key of keys) {
       const data = loadState(key, null);
       if (data !== null && data !== undefined) {
-        // 媛앹껜??寃쎌슦 鍮?媛앹껜媛 ?꾨땶吏 ?뺤씤
+        // 객체인 경우 빈 객체가 아닌지 확인
         if (typeof data === 'object' && !Array.isArray(data)) {
           const keys = Object.keys(data);
-          // 硫뷀? ?꾨뱶 ?쒖쇅?섍퀬 ?ㅼ젣 ?곗씠?곌? ?덈뒗吏 ?뺤씤
+          // 메타 필드 제외하고 실제 데이터가 있는지 확인
           const hasData = keys.some(k => !k.startsWith('_') && data[k] !== null && data[k] !== undefined);
           if (hasData) return true;
         } else if (Array.isArray(data) && data.length > 0) {
@@ -897,45 +897,45 @@ function hasStoredContent(){
     }
     return false;
   } catch (e) {
-    console.error('[hasStoredContent] ?ㅻ쪟:', e);
+    console.error('[hasStoredContent] 오류:', e);
     return false;
   }
 }
 
-/* ????λ맂 ?쒖떇 ?곗씠???뺤씤 */
+/* ✅ 저장된 서식 데이터 확인 */
 function hasStoredFormat(){
   try {
-    // WBP_FMT.map ?뺤씤 (index.html?먯꽌 ?뺤쓽??
+    // WBP_FMT.map 확인 (index.html에서 정의됨)
     if (typeof window.WBP_FMT !== 'undefined' && window.WBP_FMT && window.WBP_FMT.map) {
       const map = window.WBP_FMT.map;
       const keys = Object.keys(map);
       if (keys.length > 0) {
-        // ?ㅼ젣 ?곗씠?곌? ?덈뒗吏 ?뺤씤
+        // 실제 데이터가 있는지 확인
         const hasData = keys.some(k => map[k] !== null && map[k] !== undefined && map[k] !== '');
         if (hasData) return true;
       }
     }
     
-    // localStorage?먯꽌 吏곸젒 ?뺤씤
+    // localStorage에서 직접 확인
     const fmtData = loadState('wbps.versefmt.v2', {});
     if (fmtData && typeof fmtData === 'object' && !Array.isArray(fmtData)) {
       const keys = Object.keys(fmtData);
-      // 硫뷀? ?꾨뱶 ?쒖쇅?섍퀬 ?ㅼ젣 ?곗씠?곌? ?덈뒗吏 ?뺤씤
+      // 메타 필드 제외하고 실제 데이터가 있는지 확인
       const hasData = keys.some(k => !k.startsWith('_') && fmtData[k] !== null && fmtData[k] !== undefined && fmtData[k] !== '');
       if (hasData) return true;
     }
     
     return false;
   } catch (e) {
-    console.error('[hasStoredFormat] ?ㅻ쪟:', e);
+    console.error('[hasStoredFormat] 오류:', e);
     return false;
   }
 }
-// ===== [FORMAT-PERSIST UI] 踰꾪듉 ?앹꽦/諛붿씤??END =====
+// ===== [FORMAT-PERSIST UI] 버튼 생성/바인딩 END =====
 
-// ===== [UNIT-EDITOR] ptitle ??踰꾪듉 二쇱엯 (?꾨갑??寃ш퀬 踰꾩쟾) =====
+// ===== [UNIT-EDITOR] ptitle 옆 버튼 주입 (전방위 견고 버전) =====
 function ensureUnitChips(){
-  // ?대젮?덈뒗 ?⑤씫???놁쑝硫?紐⑤뱺 ?⑤씫???쒕룄(理쒖큹 濡쒕뱶 ?鍮?
+  // 열려있는 단락이 없으면 모든 단락에 시도(최초 로드 대비)
   const paras = document.querySelectorAll('details.para');
   if (!paras.length) return;
 
@@ -943,63 +943,63 @@ function ensureUnitChips(){
     const sum = para.querySelector('summary');
     if (!sum) return;
 
-    // 1) ptitle ?뺣낫: ?놁쑝硫?summary ?띿뒪?몃? 媛먯떥???앹꽦
+    // 1) ptitle 확보: 없으면 summary 텍스트를 감싸서 생성
     let t = sum.querySelector('.ptitle');
     if (!t) {
       t = document.createElement('span');
       t.className = 'ptitle';
-      // summary 泥?踰덉㎏ ?몃뱶媛 ?띿뒪?몃씪硫?洹??띿뒪?몃? ptitle濡????
+      // summary 첫 번째 노드가 텍스트라면 그 텍스트를 ptitle로 옮김
       const first = sum.firstChild;
       if (first && first.nodeType === Node.TEXT_NODE) {
         t.textContent = first.nodeValue.trim();
         first.nodeValue = '';
         sum.insertBefore(t, sum.firstChild);
       } else {
-        // ?띿뒪?멸? ?놁쑝硫?summary 留??욎뿉 鍮?ptitle ?쎌엯
+        // 텍스트가 없으면 summary 맨 앞에 빈 ptitle 삽입
         sum.insertBefore(t, sum.firstChild);
       }
     }
 
-    // 2) ?대? ?덉쑝硫?以묐났 ?앹꽦 湲덉?
+    // 2) 이미 있으면 중복 생성 금지
     if (t.querySelector('.unit-chips')) return;
 
-    // 3) 踰꾪듉 ?쎌엯
+    // 3) 버튼 삽입
     const wrap = document.createElement('span');
     wrap.className = 'unit-chips';
     wrap.innerHTML = `
-      <button type="button" class="unit-chip" data-type="basic">湲곕낯?댄빐</button>
-      <button type="button" class="unit-chip" data-type="structure">?댁슜援ъ“</button>
-      <button type="button" class="unit-chip" data-type="summary">硫붿꽭吏?붿빟</button>
+      <button type="button" class="unit-chip" data-type="basic">기본이해</button>
+      <button type="button" class="unit-chip" data-type="structure">내용구조</button>
+      <button type="button" class="unit-chip" data-type="summary">메세지요약</button>
     `;
     t.appendChild(wrap);
 
-    // 4) ?대┃??summary ?좉?濡??꾪뙆?섏? ?딅룄濡?李⑤떒 + ?먮뵒???닿린
+    // 4) 클릭이 summary 토글로 전파되지 않도록 차단 + 에디터 열기
     if (!wrap.dataset.bound) {
       wrap.addEventListener('click', (e)=>{
-        e.stopPropagation(); // summary???닿린/?リ린 諛⑹?
+        e.stopPropagation(); // summary의 열기/닫기 방지
         const btn = e.target.closest('.unit-chip');
         if (!btn) return;
-        // ?⑤씫???ロ? ?덉쑝硫??닿린
+        // 단락이 닫혀 있으면 열기
         if (!para.hasAttribute('open')) para.setAttribute('open','');
-        // ?먮뵒???ㅽ뻾
+        // 에디터 실행
         openUnitEditor(btn.dataset.type);
-        e.preventDefault(); // 紐⑤컮???붾툝????諛⑹?
+        e.preventDefault(); // 모바일 더블탭 등 방지
       });
       wrap.dataset.bound = '1';
     }
 
-    // 4) ?대┃ 泥섎━ (?ㅽ뵂 ?⑤씫 湲곗??쇰줈 ?먮뵒???닿린)
+    // 4) 클릭 처리 (오픈 단락 기준으로 에디터 열기)
     wrap.addEventListener('click', (e)=>{
       const btn = e.target.closest('.unit-chip');
       if (!btn) return;
-      // ??踰꾪듉???랁븳 ?⑤씫??"?대┛" ?곹깭濡?留뚮뱾怨??먮뵒???몄텧
+      // 이 버튼이 속한 단락을 "열린" 상태로 만들고 에디터 호출
       if (!para.hasAttribute('open')) para.setAttribute('open','');
       openUnitEditor(btn.dataset.type);
     });
   });
 }
 
-// ===== [FLOATING SELECTION TOOLBAR] ?좏깮 ???묒? ?대컮 ?몄텧 =====
+// ===== [FLOATING SELECTION TOOLBAR] 선택 시 작은 툴바 노출 =====
 function _ensureFloatingPlbar(){
   if (document.getElementById('wbp-plbar')) return;
   const bar = document.createElement('div');
@@ -1010,9 +1010,7 @@ function _ensureFloatingPlbar(){
     <button type="button" data-cmd="italic">I</button>
     <button type="button" data-cmd="underline">U</button>
     <div class="divider"></div>
-    <input type="color" id="wbp-color-picker" title="?됱긽 ?좏깮" style="width:34px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,.06);padding:0">
-    <div class="divider"></div>
-    <button type="button" id="wbp-save-format">???/button>
+    <button type="button" id="wbp-save-format">저장</button>
   `;
   document.body.appendChild(bar);
 
@@ -1029,19 +1027,6 @@ function _ensureFloatingPlbar(){
       catch(e){ console.error('saveFormatForOpenPara error', e); }
     }
   });
-  // ?됱긽 ?낅젰 泥섎━ (input ?대깽??
-  const colorInp = bar.querySelector('#wbp-color-picker');
-  if (colorInp){
-    colorInp.addEventListener('input', (ev)=>{
-      const color = ev.target.value;
-      if (!color) return;
-      try{
-        document.execCommand('foreColor', false, color);
-      }catch(e){
-        _wrapSelectionWithColor(color);
-      }
-    });
-  }
 }
 
 function _wrapSelectionWithTag(cmd){
@@ -1058,33 +1043,6 @@ function _wrapSelectionWithTag(cmd){
     sel.addRange(newRange);
   }catch(e){
     console.warn('[wrapSelection] surroundContents failed:', e);
-  }
-}
-
-function _wrapSelectionWithColor(color){
-  const sel = document.getSelection(); if (!sel || sel.rangeCount===0) return;
-  const range = sel.getRangeAt(0);
-  try{
-    const el = document.createElement('span');
-    el.style.color = color;
-    range.surroundContents(el);
-    sel.removeAllRanges();
-    const newRange = document.createRange();
-    newRange.selectNodeContents(el);
-    sel.addRange(newRange);
-  }catch(e){
-    // fallback: wrap by extracting contents
-    try{
-      const frag = range.cloneContents();
-      const wrapper = document.createElement('span'); wrapper.style.color = color;
-      wrapper.appendChild(frag);
-      range.deleteContents();
-      range.insertNode(wrapper);
-      sel.removeAllRanges();
-      const nr = document.createRange(); nr.selectNodeContents(wrapper); sel.addRange(nr);
-    }catch(err){
-      console.warn('[wrapSelectionColor] failed:', err);
-    }
   }
 }
 
@@ -1147,7 +1105,7 @@ function ensureFloatingSelectionToolbar(){
   });
 }
 
-// ?먮룞 珥덇린???쒕룄
+// 자동 초기화 시도
 try{ ensureFloatingSelectionToolbar(); }catch(e){ console.warn('floating toolbar init failed', e); }
 
 
@@ -1180,7 +1138,7 @@ function syncCurrentFromOpen(){
   return true;
 }
 
-// ?쒕ぉ 蹂寃?諛섏쁺
+// 제목 변경 반영
 function updateParaTitle(book, chap, idx, newTitle){
   try{
     const para = BIBLE?.books?.[book]?.[chap]?.paras?.[idx];
@@ -1193,19 +1151,19 @@ function updateParaTitle(book, chap, idx, newTitle){
   }catch(_){}
 }
 
-// JSON ?ㅼ슫濡쒕뱶
+// JSON 다운로드
 function downloadBibleJSON(){
-  if(!BIBLE){ alert('BIBLE ?곗씠?곌? ?놁뒿?덈떎.'); return; }
+  if(!BIBLE){ alert('BIBLE 데이터가 없습니다.'); return; }
   const blob = new Blob([JSON.stringify(BIBLE, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'bible-paragraphs.json';
   document.body.appendChild(a); a.click();
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
-  status('?섏젙??JSON???ㅼ슫濡쒕뱶?덉뒿?덈떎.');
+  status('수정된 JSON을 다운로드했습니다.');
 }
 
-/* ==== ?꾩껜 ?곗씠??諛깆뾽/蹂듭썝 ==== */
+/* ==== 전체 데이터 백업/복원 ==== */
 const STORAGE_SERMON      = 'wbps.sermons.v4';
 const STORAGE_LAST_SERMON_PARA = 'wbps.lastSermonPara.v4';
 const STORAGE_UNIT_CTX    = 'wbps.ctx.unit.v1';
@@ -1217,13 +1175,13 @@ const VOICE_CHOICE_KEY    = 'wbps.tts.choice.v2';
 const STORAGE_BOOK_BASIC   = 'WBP3_BOOK_BASIC';
 const STORAGE_BOOK_STRUCT  = 'WBP3_BOOK_STRUCT';
 const STORAGE_BOOK_SUMMARY = 'WBP3_BOOK_SUMMARY';
-const FMT_NS = 'WBP3_FMT';  // ?쒖떇 ?ㅼ엫?ㅽ럹?댁뒪 (validateState?먯꽌 ?ъ슜)
+const FMT_NS = 'WBP3_FMT';  // 서식 네임스페이스 (validateState에서 사용)
 
-// ===== [?듯빀 ????쒖뒪??v4] =====
+// ===== [통합 저장 시스템 v4] =====
 const STORAGE_VERSION = 4;
 const STORAGE_SCHEMA_PREFIX = 'wbps.v4';
 
-// Deep copy ?좏떥由ы떚
+// Deep copy 유틸리티
 function deepCopy(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
   if (obj instanceof Date) return new Date(obj.getTime());
@@ -1240,7 +1198,7 @@ function deepCopy(obj) {
   return obj;
 }
 
-// Shallow clone ?좏떥由ы떚
+// Shallow clone 유틸리티
 function shallowClone(obj) {
   if (obj === null || typeof obj !== 'object') return obj;
   if (obj instanceof Array) return [...obj];
@@ -1248,7 +1206,7 @@ function shallowClone(obj) {
   return obj;
 }
 
-// ??????곗씠???좏슚??寃??
+// 저장 전 데이터 유효성 검사
 function validateState(key, value) {
   if (key === null || key === undefined || typeof key !== 'string') {
     console.warn('[validateState] Invalid key:', key);
@@ -1258,19 +1216,19 @@ function validateState(key, value) {
     console.warn('[validateState] Value is undefined for key:', key);
     return false;
   }
-  // ?뱀젙 ?ㅼ뿉 ???異붽? 寃利?
+  // 특정 키에 대한 추가 검증
   if (key.startsWith('WBP3_FMT:') || key.startsWith(FMT_NS + ':')) {
     if (typeof value === 'object' && value !== null) {
       if (!value.hasOwnProperty('v') && !value.hasOwnProperty('version')) {
         console.warn('[validateState] Format data missing version:', key);
-        // 踰꾩쟾 ?뺣낫媛 ?놁뼱???덉슜 (援ы삎 ?곗씠???명솚)
+        // 버전 정보가 없어도 허용 (구형 데이터 호환)
       }
     }
   }
   return true;
 }
 
-// ????ㅽ뙣 ??諛깆뾽 ?앹꽦
+// 저장 실패 시 백업 생성
 function backupState(key, value) {
   try {
     const backupKey = `${key}.backup.${Date.now()}`;
@@ -1288,16 +1246,16 @@ function backupState(key, value) {
   }
 }
 
-// ?댁쟾 踰꾩쟾 ?ㅽ궎留??먮룞 蹂??(v3 ??v4)
+// 이전 버전 스키마 자동 변환 (v3 → v4)
 function migrateState(key, rawValue) {
   try {
-    // v3 ?ㅽ궎留?媛먯? 諛?蹂??
+    // v3 스키마 감지 및 변환
     if (key.startsWith('wbps.') && !key.includes('.v4')) {
-      // v3 ?ㅻ? v4濡?留덉씠洹몃젅?댁뀡
+      // v3 키를 v4로 마이그레이션
       const migratedKey = key.replace(/\.v(\d+)$/, '.v4');
       if (migratedKey !== key) {
-        console.log(`[migrateState] Migrating ${key} ??${migratedKey}`);
-        // 湲곗〈 ?곗씠?곕? ???ㅻ줈 蹂듭궗
+        console.log(`[migrateState] Migrating ${key} → ${migratedKey}`);
+        // 기존 데이터를 새 키로 복사
         try {
           const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
           const migrated = {
@@ -1315,7 +1273,7 @@ function migrateState(key, rawValue) {
       }
     }
     
-    // 媛??먯껜??踰꾩쟾 ?뺣낫媛 ?녿뒗 寃쎌슦 異붽?
+    // 값 자체에 버전 정보가 없는 경우 추가
     if (typeof rawValue === 'string') {
       try {
         const parsed = JSON.parse(rawValue);
@@ -1324,7 +1282,7 @@ function migrateState(key, rawValue) {
           return { key, value: parsed };
         }
       } catch (e) {
-        // JSON???꾨땶 寃쎌슦 洹몃?濡?諛섑솚
+        // JSON이 아닌 경우 그대로 반환
       }
     }
     
@@ -1335,7 +1293,7 @@ function migrateState(key, rawValue) {
   }
 }
 
-// "**" ?쒓굅 ?⑥닔 (?ш??곸쑝濡?紐⑤뱺 臾몄옄?댁뿉???쒓굅)
+// "**" 제거 함수 (재귀적으로 모든 문자열에서 제거)
 function removeBoldMarkers(obj) {
   if (typeof obj === 'string') {
     return obj.replace(/\*\*/g, '');
@@ -1347,7 +1305,7 @@ function removeBoldMarkers(obj) {
     const result = {};
     for (const key in obj) {
       if (obj.hasOwnProperty(key)) {
-        // 硫뷀? ?꾨뱶(_version, _savedAt ?????쒖쇅
+        // 메타 필드(_version, _savedAt 등)는 제외
         if (key.startsWith('_')) {
           result[key] = obj[key];
         } else {
@@ -1360,7 +1318,7 @@ function removeBoldMarkers(obj) {
   return obj;
 }
 
-// ?⑥씪 ????⑥닔
+// 단일 저장 함수
 function saveState(key, value, options = {}) {
   if (!validateState(key, value)) {
     console.error('[saveState] Validation failed for key:', key);
@@ -1368,13 +1326,13 @@ function saveState(key, value, options = {}) {
   }
 
   try {
-    // ???吏곸쟾 deep copy
+    // 저장 직전 deep copy
     const dataToSave = deepCopy(value);
     
-    // "**" ?쒓굅 (紐⑤뱺 臾몄옄?댁뿉??
+    // "**" 제거 (모든 문자열에서)
     const cleanedData = removeBoldMarkers(dataToSave);
     
-    // ?ㅽ궎留덉뿉 踰꾩쟾 ?뺣낫 異붽?
+    // 스키마에 버전 정보 추가
     let finalValue = cleanedData;
     if (typeof cleanedData === 'object' && cleanedData !== null && !Array.isArray(cleanedData)) {
       finalValue = {
@@ -1384,24 +1342,24 @@ function saveState(key, value, options = {}) {
       };
     }
     
-    // JSON 吏곷젹??
+    // JSON 직렬화
     const serialized = typeof finalValue === 'string' 
       ? finalValue 
       : JSON.stringify(finalValue);
     
-    // ????쒕룄
+    // 저장 시도
     localStorage.setItem(key, serialized);
     
-    // 踰꾪듉 ?됱긽 ?낅뜲?댄듃 (?댁슜 ?먮뒗 ?쒖떇 愿???ㅼ씤 寃쎌슦)
+    // 버튼 색상 업데이트 (내용 또는 서식 관련 키인 경우)
     if (key === STORAGE_SERMON || key === STORAGE_UNIT_CTX || key === STORAGE_WHOLE_CTX || 
         key === STORAGE_COMMENTARY || key === STORAGE_SUMMARY || key === 'wbps.versefmt.v2') {
       setTimeout(updateButtonColors, 100);
     }
     
-    // ???吏곹썑 shallow clone?쇰줈 ?뺤씤
+    // 저장 직후 shallow clone으로 확인
     const saved = shallowClone(finalValue);
     
-    // ????깃났 ?대깽??諛쒖깮
+    // 저장 성공 이벤트 발생
     if (!options.silent) {
       window.dispatchEvent(new CustomEvent('wbps:stateSaved', {
         detail: { key, value: saved }
@@ -1411,28 +1369,28 @@ function saveState(key, value, options = {}) {
     return true;
   } catch (e) {
     console.error('[saveState] Save failed:', e);
-    // ????ㅽ뙣 ??諛깆뾽 ?앹꽦
+    // 저장 실패 시 백업 생성
     backupState(key, value);
     return false;
   }
 }
 
-// ????몄텧 ?뺢퇋??(debounce) - ?⑥씪 ?대깽??猷⑦봽
+// 저장 호출 정규화 (debounce) - 단일 이벤트 루프
 const saveQueue = new Map();
 let saveTimer = null;
 const DEFAULT_SAVE_DELAY = 300;
 
-// ?듯빀 ????대깽???몃뱾??
+// 통합 저장 이벤트 핸들러
 function debounceSave(key, value, delay = DEFAULT_SAVE_DELAY) {
-  // ?먯뿉 異붽?
+  // 큐에 추가
   saveQueue.set(key, value);
   
-  // 湲곗〈 ??대㉧ 痍⑥냼
+  // 기존 타이머 취소
   if (saveTimer) clearTimeout(saveTimer);
   
-  // ????대㉧ ?ㅼ젙
+  // 새 타이머 설정
   saveTimer = setTimeout(() => {
-    // ?먯쓽 紐⑤뱺 ??ぉ ???
+    // 큐의 모든 항목 저장
     const count = saveQueue.size;
     const savedKeys = [];
     for (const [k, v] of saveQueue.entries()) {
@@ -1443,16 +1401,16 @@ function debounceSave(key, value, delay = DEFAULT_SAVE_DELAY) {
     saveQueue.clear();
     saveTimer = null;
     
-    // ?쇨큵 ????꾨즺 ?대깽??
+    // 일괄 저장 완료 이벤트
     window.dispatchEvent(new CustomEvent('wbps:batchSaved', {
       detail: { count, savedKeys }
     }));
   }, delay);
 }
 
-// ?꾩뿭 ????대깽??由ъ뒪???듯빀
+// 전역 저장 이벤트 리스너 통합
 (function setupUnifiedSaveEventLoop() {
-  // 紐⑤뱺 ????붿껌???⑥씪 ?대깽?몃줈 泥섎━
+  // 모든 저장 요청을 단일 이벤트로 처리
   window.addEventListener('wbps:saveRequest', (e) => {
     const { key, value, delay } = e.detail || {};
     if (key !== undefined && value !== undefined) {
@@ -1460,7 +1418,7 @@ function debounceSave(key, value, delay = DEFAULT_SAVE_DELAY) {
     }
   }, { capture: true });
   
-  // 利됱떆 ????붿껌 (debounce ?놁쓬)
+  // 즉시 저장 요청 (debounce 없음)
   window.addEventListener('wbps:saveImmediate', (e) => {
     const { key, value } = e.detail || {};
     if (key !== undefined && value !== undefined) {
@@ -1469,7 +1427,7 @@ function debounceSave(key, value, delay = DEFAULT_SAVE_DELAY) {
   }, { capture: true });
 })();
 
-// ?듯빀 濡쒕뵫 ?⑥닔
+// 통합 로딩 함수
 function loadState(key, defaultValue = null, options = {}) {
   try {
     const raw = localStorage.getItem(key);
@@ -1477,21 +1435,21 @@ function loadState(key, defaultValue = null, options = {}) {
       return defaultValue;
     }
     
-    // 留덉씠洹몃젅?댁뀡 泥댄겕
+    // 마이그레이션 체크
     if (options.migrate !== false) {
       const migrated = migrateState(key, raw);
       if (migrated.key !== key) {
-        // 留덉씠洹몃젅?댁뀡??寃쎌슦 ???ㅻ줈 ?ㅼ떆 濡쒕뱶
+        // 마이그레이션된 경우 새 키로 다시 로드
         return loadState(migrated.key, defaultValue, { migrate: false });
       }
     }
     
-    // ?뚯떛 ?쒕룄
+    // 파싱 시도
     try {
       const parsed = JSON.parse(raw);
       return parsed;
     } catch (e) {
-      // JSON???꾨땶 寃쎌슦 ?먮낯 諛섑솚
+      // JSON이 아닌 경우 원본 반환
       return raw;
     }
   } catch (e) {
@@ -1500,7 +1458,7 @@ function loadState(key, defaultValue = null, options = {}) {
   }
 }
 
-// 珥덇린?????먮룞 留덉씠洹몃젅?댁뀡 ?ㅽ뻾
+// 초기화 시 자동 마이그레이션 실행
 (function autoMigrate() {
   try {
     const keys = Object.keys(localStorage);
@@ -1521,7 +1479,7 @@ function loadState(key, defaultValue = null, options = {}) {
     console.error('[autoMigrate] Migration error:', e);
   }
 })();
-// ===== [?듯빀 ????쒖뒪??v4] END =====
+// ===== [통합 저장 시스템 v4] END =====
 
 function todayStr(){
   const d=new Date();
@@ -1539,22 +1497,22 @@ function exportAllData(){
   a.download = `wbps-backup-${tss}.json`;
   document.body.appendChild(a); a.click();
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
-  status('?꾩껜 ?곗씠?곕? ?대낫?덉뒿?덈떎.');
+  status('전체 데이터를 내보냈습니다.');
 }
 async function importAllData(file){
   try{
     const text = await file.text();
     const json = JSON.parse(text);
-    if(!json || json.__wbps!==1 || !json.items){ alert('諛깆뾽 ?뚯씪 ?뺤떇???꾨떃?덈떎.'); return; }
-    if(!confirm('??諛깆뾽?쇰줈 ?꾩옱 湲곌린???곗씠?곕? ??뼱?멸퉴??')) return;
+    if(!json || json.__wbps!==1 || !json.items){ alert('백업 파일 형식이 아닙니다.'); return; }
+    if(!confirm('이 백업으로 현재 기기의 데이터를 덮어쓸까요?')) return;
     Object.entries(json.items).forEach(([k,v])=>{
       if(v===null || v===undefined) localStorage.removeItem(k);
       else saveState(k, v);
     });
-    status('媛?몄삤湲곌? ?꾨즺?섏뿀?듬땲?? ?섏씠吏瑜??덈줈怨좎묠?섎㈃ 諛섏쁺?⑸땲??');
+    status('가져오기가 완료되었습니다. 페이지를 새로고침하면 반영됩니다.');
   }catch(e){
     console.error(e);
-    alert('媛?몄삤湲?以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.');
+    alert('가져오기 중 오류가 발생했습니다.');
   }
 }
 
@@ -1571,19 +1529,17 @@ let BIBLE = null;
 let CURRENT = { book:null, chap:null, paraIdx:null, paraId:null };
 let READER = { playing:false, q:[], idx:0, synth:window.speechSynthesis||null, scope:null, btn:null, continuous:false };
 let EDITOR_READER = { playing:false, u:null, synth:window.speechSynthesis||null };
-// ?깃꼍 ?쎄린(STT) ?곹깭: ?꾩옱 ?덉쓣 留욎텛硫??먮룞 ?ㅼ쓬 ?덈줈 ?대룞
-let LISTENER = { active:false, rec:null, scope:null, btn:null, q:[], idx:0, book:null, chap:null, paraIdx:null };
 
 /* --------- Boot --------- */
 (async function boot(){
   const startTime = performance.now();
   
   try {
-    // ?? IndexedDB 罹먯떛 ?쒖뒪???ъ슜 (?щ갑臾???利됱떆 濡쒕뵫!)
+    // 🚀 IndexedDB 캐싱 시스템 사용 (재방문 시 즉시 로딩!)
     if (window.__WBP_BIBLE_CACHE__?.loadBible) {
       BIBLE = await window.__WBP_BIBLE_CACHE__.loadBible();
     } else {
-      // fallback: 罹먯떛 ?쒖뒪?쒖씠 ?놁쑝硫?吏곸젒 fetch
+      // fallback: 캐싱 시스템이 없으면 직접 fetch
       try {
         BIBLE = await tryFetchJSON('bible-paragraphs.json');
       } catch(_) {
@@ -1591,21 +1547,21 @@ let LISTENER = { active:false, rec:null, scope:null, btn:null, q:[], idx:0, book
       }
     }
   } catch(e) {
-    status('bible-paragraphs.json??李얠쓣 ???놁뒿?덈떎. 媛숈? ?대뜑???먭퀬 ?ㅼ떆 ?댁뼱二쇱꽭??');
-    console.error('[Boot] ?깃꼍 ?곗씠??濡쒕뱶 ?ㅽ뙣:', e);
+    status('bible-paragraphs.json을 찾을 수 없습니다. 같은 폴더에 두고 다시 열어주세요.');
+    console.error('[Boot] 성경 데이터 로드 실패:', e);
     return;
   }
   
   buildTree();
-  ensureSermonButtons();   // ?뵩 ?ㅺ탳 踰꾪듉 ?꾨씫 ??蹂닿컯
+  ensureSermonButtons();   // 🔧 설교 버튼 누락 시 보강
   
   const loadTime = (performance.now() - startTime).toFixed(0);
-  status(`遺덈윭?ㅺ린 ?꾨즺 (${loadTime}ms). 66沅??몃━媛 ?쒖꽦?붾릺?덉뒿?덈떎.`);
-  console.log(`[Boot] ???꾩껜 珥덇린???꾨즺: ${loadTime}ms`);
+  status(`불러오기 완료 (${loadTime}ms). 66권 트리가 활성화되었습니다.`);
+  console.log(`[Boot] ✅ 전체 초기화 완료: ${loadTime}ms`);
   
   await setupVoices();
   
-  // ?꾨줈洹몃옩 ?쒖옉 ???ㅺ탳紐⑸줉 ?먮룞 ?쒖떆 鍮꾪솢?깊솕 (?ㅺ탳紐⑸줉 踰꾪듉???뚮윭???쒖떆??
+  // 프로그램 시작 시 설교목록 자동 표시 비활성화 (설교목록 버튼을 눌러야 표시됨)
   // restoreSermonListOnStartup();
 })();
 
@@ -1636,23 +1592,23 @@ function waitForVoices(timeout=1500){
 function getKoreanVoices(all){
   return (all||[]).filter(v=>{
     const n=(v.name||'').toLowerCase(), l=(v.lang||'').toLowerCase();
-    return l.startsWith('ko') || n.includes('korean') || n.includes('?쒓뎅') || n.includes('korea');
+    return l.startsWith('ko') || n.includes('korean') || n.includes('한국') || n.includes('korea');
   });
 }
 function presetsForSingleVoice(){
   return [
-    {id:'preset-soft-low',  label:'?꾨━??쨌 ????먮┝',   rate:0.85, pitch:0.85},
-    {id:'preset-soft-high', label:'?꾨━??쨌 怨좎쓬/?먮┝',   rate:0.90, pitch:1.20},
-    {id:'preset-fast',      label:'?꾨━??쨌 鍮좊쫫',       rate:1.20, pitch:1.05},
-    {id:'preset-bright',    label:'?꾨━??쨌 諛앷쾶',       rate:1.05, pitch:1.25},
-    {id:'preset-radio',     label:'?꾨━??쨌 ?쇰뵒?ㅽ넠',   rate:1.00, pitch:0.90},
-    {id:'preset-reading',   label:'?꾨━??쨌 ??룆泥?,     rate:0.95, pitch:1.00},
+    {id:'preset-soft-low',  label:'프리셋 · 저음/느림',   rate:0.85, pitch:0.85},
+    {id:'preset-soft-high', label:'프리셋 · 고음/느림',   rate:0.90, pitch:1.20},
+    {id:'preset-fast',      label:'프리셋 · 빠름',       rate:1.20, pitch:1.05},
+    {id:'preset-bright',    label:'프리셋 · 밝게',       rate:1.05, pitch:1.25},
+    {id:'preset-radio',     label:'프리셋 · 라디오톤',   rate:1.00, pitch:0.90},
+    {id:'preset-reading',   label:'프리셋 · 낭독체',     rate:0.95, pitch:1.00},
   ];
 }
 async function setupVoices(){
-  // ?뚯꽦 ?좏깮 UI ?붿냼媛 ?놁쑝硫?嫄대꼫?곌린
+  // 음성 선택 UI 요소가 없으면 건너뛰기
   if (!voiceSelect) {
-    console.warn('[setupVoices] voiceSelect ?붿냼瑜?李얠쓣 ???놁뒿?덈떎. ?뚯꽦 ?좏깮 UI媛 ?놁뼱????룆 湲곕뒫? ?묐룞?⑸땲??');
+    console.warn('[setupVoices] voiceSelect 요소를 찾을 수 없습니다. 음성 선택 UI가 없어도 낭독 기능은 작동합니다.');
     return;
   }
   
@@ -1662,21 +1618,21 @@ async function setupVoices(){
   voiceSelect.innerHTML = '';
   const def = document.createElement('option');
   def.value = JSON.stringify({type:'default'});
-  def.textContent = '釉뚮씪?곗? 湲곕낯(ko-KR)';
+  def.textContent = '브라우저 기본(ko-KR)';
   voiceSelect.appendChild(def);
 
   if(kos.length > 0){
-    const og = document.createElement('optgroup'); og.label = '?쒓뎅??蹂댁씠??;
+    const og = document.createElement('optgroup'); og.label = '한국어 보이스';
     kos.forEach(v=>{
       const opt = document.createElement('option');
       opt.value = JSON.stringify({type:'voice', uri:v.voiceURI});
-      opt.textContent = `${v.name} ??${v.lang}${v.localService ? ' (濡쒖뺄)' : ''}`;
+      opt.textContent = `${v.name} — ${v.lang}${v.localService ? ' (로컬)' : ''}`;
       og.appendChild(opt);
     });
     voiceSelect.appendChild(og);
   }
   if(kos.length <= 1){
-    const pg = document.createElement('optgroup'); pg.label = '?ㅽ????꾨━??;
+    const pg = document.createElement('optgroup'); pg.label = '스타일 프리셋';
     presetsForSingleVoice().forEach(p=>{
       const opt = document.createElement('option');
       opt.value = JSON.stringify({type:'preset', rate:p.rate, pitch:p.pitch});
@@ -1690,7 +1646,7 @@ async function setupVoices(){
 
   const saved = loadState(VOICE_CHOICE_KEY, null);
   if(saved){
-    // saved媛 媛앹껜??寃쎌슦 JSON 臾몄옄?대줈 蹂?섑븯??鍮꾧탳
+    // saved가 객체인 경우 JSON 문자열로 변환하여 비교
     const savedStr = typeof saved === 'string' ? saved : JSON.stringify(saved);
     const idx = [...voiceSelect.options].findIndex(o=>o.value===savedStr);
     if(idx>=0) voiceSelect.selectedIndex = idx;
@@ -1698,12 +1654,12 @@ async function setupVoices(){
     saveState(VOICE_CHOICE_KEY, voiceSelect.value);
   }
   voiceSelect.addEventListener('change', ()=> debounceSave(VOICE_CHOICE_KEY, voiceSelect.value));
-  if (testVoiceBtn) testVoiceBtn.onclick = ()=> speakSample('?쒖큹???섎굹?섏씠 泥쒖?瑜?李쎌“?섏떆?덈씪.');
+  if (testVoiceBtn) testVoiceBtn.onclick = ()=> speakSample('태초에 하나님이 천지를 창조하시니라.');
 }
 function resolveVoiceChoice(){
   const saved = loadState(VOICE_CHOICE_KEY, null);
   if(!saved) return {type:'default'};
-  // saved媛 臾몄옄??JSON)??寃쎌슦 ?뚯떛, 媛앹껜??寃쎌슦 洹몃?濡??ъ슜
+  // saved가 문자열(JSON)인 경우 파싱, 객체인 경우 그대로 사용
   if(typeof saved === 'string') {
     try {
       return JSON.parse(saved);
@@ -1711,14 +1667,14 @@ function resolveVoiceChoice(){
       return {type:'default'};
     }
   }
-  // ?대? 媛앹껜??寃쎌슦 洹몃?濡?諛섑솚
+  // 이미 객체인 경우 그대로 반환
   return saved;
 }
 function pickVoiceByURI(uri){ return (speechSynthesis.getVoices?.()||[]).find(v=>v.voiceURI===uri) || null; }
 function applyVoice(u){
   const choice = resolveVoiceChoice();
   if(!choice || typeof choice !== 'object') {
-    // choice媛 ?좏슚?섏? ?딆? 寃쎌슦 湲곕낯媛??ъ슜
+    // choice가 유효하지 않은 경우 기본값 사용
     u.lang = 'ko-KR';
     u.rate = parseFloat(rateCtl?.value||'0.95');
     u.pitch = parseFloat(pitchCtl?.value||'1');
@@ -1750,7 +1706,7 @@ function speakSample(text){
 /* --------- Tree --------- */
 function buildTree(){
   treeEl.innerHTML = '';
-  if(!BIBLE){ treeEl.innerHTML = '<div class="muted">?뚯씪??李얠쓣 ???놁뒿?덈떎.</div>'; return; }
+  if(!BIBLE){ treeEl.innerHTML = '<div class="muted">파일을 찾을 수 없습니다.</div>'; return; }
 
   for(const bookName of Object.keys(BIBLE.books)){
     const detBook = document.createElement('details');
@@ -1764,7 +1720,7 @@ function buildTree(){
     for(const chap of chapters){
       const detChap = document.createElement('details');
       const sumChap = document.createElement('summary');
-      sumChap.innerHTML = `<span class="chip">${chap}??/span>`;
+      sumChap.innerHTML = `<span class="chip">${chap}장</span>`;
       detChap.appendChild(sumChap);
 
       const parWrap = document.createElement('div'); parWrap.className='paras';
@@ -1786,7 +1742,7 @@ function buildTree(){
                 data-book="${bookName}"
                 data-ch="${chap}"
                 data-idx="${idx}"
-                title="?쒕ぉ???붾툝?대┃?섎㈃ ?몄쭛?????덉뒿?덈떎">${escapeHtml(titleText)}</span>
+                title="제목을 더블클릭하면 편집할 수 있습니다">${escapeHtml(titleText)}</span>
         `;
 
         const titleEl = sum.querySelector('.ptitle');
@@ -1815,19 +1771,18 @@ function buildTree(){
         body.className = 'pbody';
         body.innerHTML = `
           <div class="ptoolbar">
-            <button class="primary speakBtn">??룆</button>
-            <button class="listenBtn">?뚯꽦?쎄린</button>
-            <label class="chip"><input type="checkbox" class="keepReading" style="margin-right:6px">怨꾩냽 ??룆</label>
-            <button class="ctxBtn btnSummary">?댁슜?먮쫫</button>
-            <button class="ctxBtn btnUnitCtx">?⑥쐞?깃꼍??留λ씫</button>
-            <button class="ctxBtn btnWholeCtx">?꾩껜?깃꼍??留λ씫</button>
-            <button class="ctxBtn btnCommentary">二쇱꽍</button>
-            <button class="sermBtn">?ㅺ탳紐⑸줉</button>
+            <button class="primary speakBtn">낭독</button>
+            <label class="chip"><input type="checkbox" class="keepReading" style="margin-right:6px">계속 낭독</label>
+            <button class="ctxBtn btnSummary">내용흐름</button>
+            <button class="ctxBtn btnUnitCtx">단위성경속 맥락</button>
+            <button class="ctxBtn btnWholeCtx">전체성경속 맥락</button>
+            <button class="ctxBtn btnCommentary">주석</button>
+            <button class="sermBtn">설교목록</button>
             <div class="spacer"></div>
           </div>
           <div class="pcontent"></div>`;
 
-        // [PATCH 1 START] ?ㅺ탳 踰꾪듉 ?앹꽦/媛?쒖꽦留?蹂닿컯 (?대┃ 諛붿씤???놁쓬)
+        // [PATCH 1 START] 설교 버튼 생성/가시성만 보강 (클릭 바인딩 없음)
         (function ensureSermonBtn(){
           const tb = body.querySelector('.ptoolbar');
           if (!tb) return;
@@ -1841,7 +1796,7 @@ function buildTree(){
           if (!sermBtn) {
             sermBtn = document.createElement('button');
             sermBtn.className = 'sermBtn';
-            sermBtn.textContent = '?ㅺ탳紐⑸줉';
+            sermBtn.textContent = '설교목록';
             tb.appendChild(sermBtn);
           }
         })();
@@ -1850,7 +1805,7 @@ function buildTree(){
         detPara.appendChild(body);
 
         const pcontent = body.querySelector('.pcontent');
-        // ?깃꼍 蹂몃Ц ?몄쭛???꾪빐 contenteditable ?ㅼ젙
+        // 성경 본문 편집을 위해 contenteditable 설정
         pcontent.setAttribute('contenteditable', 'true');
         (p.verses||[]).forEach(([v,t])=>{
           const line = document.createElement('div');
@@ -1865,13 +1820,13 @@ function buildTree(){
             CURRENT.book = bookName; CURRENT.chap = chap; CURRENT.paraIdx = idx;
             const para = BIBLE.books[bookName][chap].paras[idx];
             CURRENT.paraId = `${bookName}|${chap}|${para.ref}`;
-            status(`?좏깮?? ${bookName} ${chap}??쨌 ${para.title||para.ref}`);
-            // ?대┫ ???ㅺ탳 踰꾪듉 ?꾨씫 ??利됱떆 ?앹꽦 (?대┃ 諛붿씤???놁쓬)
+            status(`선택됨: ${bookName} ${chap}장 · ${para.title||para.ref}`);
+            // 열릴 때 설교 버튼 누락 시 즉시 생성 (클릭 바인딩 없음)
             const tb = detPara.querySelector('.ptoolbar');
             if (tb && !tb.querySelector('.sermBtn')) {
               const btn = document.createElement('button');
               btn.className = 'sermBtn';
-              btn.textContent = '?ㅺ탳';
+              btn.textContent = '설교';
               tb.appendChild(btn);
             }
           }
@@ -1880,15 +1835,12 @@ function buildTree(){
         body.querySelector('.speakBtn').addEventListener('click', ()=>{
           toggleSpeakInline(bookName, chap, idx, detPara, body.querySelector('.speakBtn'));
         });
-        body.querySelector('.listenBtn').addEventListener('click', ()=>{
-          toggleListenInline(bookName, chap, idx, detPara, body.querySelector('.listenBtn'));
-        });
 
-        // 而⑦뀓?ㅽ듃 ?먮뵒??踰꾪듉??
-        body.querySelector('.btnUnitCtx').addEventListener('click', ()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('unit'); }); // ?⑥쐞?깃꼍???몄쭛湲??몄텧
-        body.querySelector('.btnWholeCtx').addEventListener('click',()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('whole'); }); // ?꾩껜?깃꼍???몄쭛湲??몄텧
-        body.querySelector('.btnCommentary').addEventListener('click',()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('commentary'); }); // 二쇱꽍 ?몄쭛湲??몄텧
-        body.querySelector('.btnSummary').addEventListener('click',   ()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('summary'); }); // ?댁슜?먮쫫 ?몄쭛湲??몄텧
+        // 컨텍스트 에디터 버튼들
+        body.querySelector('.btnUnitCtx').addEventListener('click', ()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('unit'); }); // 단위성경속 편집기 호출
+        body.querySelector('.btnWholeCtx').addEventListener('click',()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('whole'); }); // 전체성경속 편집기 호출
+        body.querySelector('.btnCommentary').addEventListener('click',()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('commentary'); }); // 주석 편집기 호출
+        body.querySelector('.btnSummary').addEventListener('click',   ()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('summary'); }); // 내용흐름 편집기 호출
 
         parWrap.appendChild(detPara);
       });
@@ -1900,11 +1852,11 @@ function buildTree(){
     detBook.appendChild(chWrap);
     treeEl.appendChild(detBook);
   }
-    // ??諛붾줈 ?ш린????以?異붽??⑸땲???몙?몙?몙
+    // ✅ 바로 여기에 한 줄 추가합니다 👇👇👇
   document.dispatchEvent(new CustomEvent('wbp:treeBuilt'));
 }
 
-// [PATCH 2 START] ?뚮뜑 ?꾩뿉???ㅺ탳 踰꾪듉 ?꾨씫 ???먮룞 蹂댁젙(?대┃ 諛붿씤???놁쓬)
+// [PATCH 2 START] 렌더 후에도 설교 버튼 누락 시 자동 보정(클릭 바인딩 없음)
 (function sermonBtnWatcher(){
   const root = document.getElementById('tree');
   if (!root) return;
@@ -1918,19 +1870,19 @@ function buildTree(){
     if (!tb.querySelector('.sermBtn')) {
       const b = document.createElement('button');
       b.className = 'sermBtn';
-      b.textContent = '?ㅺ탳';
+      b.textContent = '설교';
       tb.appendChild(b);
     }
   }
 
-  let isSweeping = false; // 臾댄븳 猷⑦봽 諛⑹? ?뚮옒洹?
+  let isSweeping = false; // 무한 루프 방지 플래그
   function sweep(){
-    if(isSweeping) return; // ?대? ?ㅼ쐲 以묒씠硫?臾댁떆
+    if(isSweeping) return; // 이미 스윕 중이면 무시
     isSweeping = true;
     try {
       root.querySelectorAll('details.para .ptoolbar').forEach(fix);
     } finally {
-      // ?ㅼ쓬 ?대깽??猷⑦봽?먯꽌 ?뚮옒洹??댁젣
+      // 다음 이벤트 루프에서 플래그 해제
       setTimeout(() => { isSweeping = false; }, 0);
     }
   }
@@ -1940,7 +1892,7 @@ function buildTree(){
 })();
 // [PATCH 2 END]
 
-/* ???몃━ ?뚮뜑 ???ㅺ탳 踰꾪듉???꾨씫?먯쓣 ???먮룞 蹂닿컯(?대┃ 諛붿씤???놁쓬) */
+/* ✅ 트리 렌더 후 설교 버튼이 누락됐을 때 자동 보강(클릭 바인딩 없음) */
 function ensureSermonButtons(){
   document.querySelectorAll('#tree details.para .ptoolbar').forEach(tb=>{
     if (tb.querySelector('.sermBtn')) return;
@@ -1954,12 +1906,12 @@ function ensureSermonButtons(){
 
     const btn = document.createElement('button');
     btn.className = 'sermBtn';
-    btn.textContent = '?ㅺ탳';
+    btn.textContent = '설교';
     tb.appendChild(btn);
   });
 }
 
-/* ?뵩 ?몃━ ?꾩엫 ?대┃ 怨듭슜 泥섎━ (?좎씪???대┃ 諛붿씤?? */
+/* 🔧 트리 위임 클릭 공용 처리 (유일한 클릭 바인딩) */
 treeEl.addEventListener('click', (e)=>{
   const isCtxBtn = e.target.closest('.btnSummary, .btnUnitCtx, .btnWholeCtx, .btnCommentary, .sermBtn');
   if (!isCtxBtn) return;
@@ -1981,40 +1933,40 @@ treeEl.addEventListener('click', (e)=>{
   if (e.target.closest('.btnCommentary')) { openSingleDocEditor('commentary'); return; }
   if (e.target.closest('.sermBtn'))       { openSermonListModal();             return; }
 
-  // === [BOOK-CHIP ??'?댁슜?먮쫫' ?몄쭛湲??숈씪 ?ъ슜] =========================
+  // === [BOOK-CHIP → '내용흐름' 편집기 동일 사용] =========================
   const chip = e.target.closest('.book-chip[data-type="basic"], .book-chip[data-type="structure"], .book-chip[data-type="summary"]');
   if (chip) {
     e.preventDefault();
     e.stopPropagation();
 
-    // 2媛??댁긽 梨??ㅽ뵂 ???쒗븳
+    // 2개 이상 책 오픈 시 제한
     const openedBooks = [...document.querySelectorAll('#tree details.book[open]')];
     if (openedBooks.length > 1) {
-      alert('2媛??댁긽 ?깃꼍???대젮 ?덉뒿?덈떎. ??沅뚮쭔 ???ㅼ쓬 ?ㅼ떆 ?쒕룄?섏꽭??');
+      alert('2개 이상 성경이 열려 있습니다. 한 권만 연 다음 다시 시도하세요.');
       return;
     }
 
-    // ???梨? ?대젮?덈뒗 梨?1媛??먮뒗 泥?梨?
+    // 대상 책: 열려있는 책 1개 또는 첫 책
     const bookEl = openedBooks[0] || document.querySelector('#tree > details.book');
     if (!bookEl) return;
 
-    // ??梨낆쓽 1??/ 泥??⑤씫
+    // 이 책의 1장 / 첫 단락
     const ch1 = bookEl.querySelector(':scope > .chapters > details') || bookEl.querySelector('details');
     const p1  = ch1?.querySelector(':scope > .paras > details.para') || ch1?.querySelector('details.para');
     if (!p1) return;
 
-    // '?댁슜?먮쫫' ?몃━嫄?踰꾪듉 ?먯깋
+    // '내용흐름' 트리거 버튼 탐색
     const flowBtn =
       p1.querySelector('.ptoolbar [data-action="flow"]') ||
       p1.querySelector('.ptoolbar .btn-flow') ||
-      [...(p1.querySelectorAll('.ptoolbar button')||[])].find(b => (b.textContent||'').trim() === '?댁슜?먮쫫');
+      [...(p1.querySelectorAll('.ptoolbar button')||[])].find(b => (b.textContent||'').trim() === '내용흐름');
 
     if (!flowBtn) return;
 
-    // ?댁슜?먮쫫 ?몄쭛湲곕? 洹몃?濡??몄텧
+    // 내용흐름 편집기를 그대로 호출
     flowBtn.click();
 
-    // ?먮뵒????댄???移??쇰꺼濡?援먯껜 (?ㅽ???湲곕뒫? ?댁슜?먮쫫 洹몃?濡?
+    // 에디터 타이틀을 칩 라벨로 교체 (스타일/기능은 내용흐름 그대로)
     const label = (chip.textContent||'').trim();
     setTimeout(()=>{
       const dlg =
@@ -2050,7 +2002,7 @@ function clearReadingHighlight(scope){
       el.classList.remove('reading');
       el.removeAttribute('data-reading-sentence');
     }
-    // 臾몄옣 ?섏씠?쇱씠??span ?쒓굅
+    // 문장 하이라이트 span 제거
     el.querySelectorAll('.sentence-reading').forEach(span => {
       const parent = span.parentNode;
       if (parent) {
@@ -2067,20 +2019,20 @@ function bindKeepReading(scope){
   cb.disabled = false;
   cb.onchange = ()=>{ READER.continuous = cb.checked; };
 }
-// 臾몄옣 遺꾪븷 ?⑥닔 (?쒓뎅???곷Ц 醫낃껐遺??湲곗?)
+// 문장 분할 함수 (한국어/영문 종결부호 기준)
 function splitToSentences(text) {
   const t = String(text || '').trim();
   if (!t) return [];
-  // 留덉묠?? 臾쇱쓬?? ?먮굦?? 留먯쨪?꾪몴, ?쒓뎅??醫낃껐(??)???쇰컲 留덉묠?쒕줈 泥섎━
-  const parts = t.split(/(?<=[\.!\???|[?귨펯竊?)\s+/u).filter(s => s && s.trim().length > 0);
+  // 마침표, 물음표, 느낌표, 말줄임표, 한국어 종결(다.)도 일반 마침표로 처리
+  const parts = t.split(/(?<=[\.!\?…]|[。！？])\s+/u).filter(s => s && s.trim().length > 0);
   return parts;
 }
 
-// ???대???臾몄옣???섏씠?쇱씠?명븯湲??꾪븳 ?⑥닔
+// 절 내부의 문장을 하이라이트하기 위한 함수
 function highlightSentenceInLine(line, sentenceIndex, sentences) {
   if (!line || !sentences || sentenceIndex < 0 || sentenceIndex >= sentences.length) return;
   
-  // 湲곗〈 臾몄옣 ?섏씠?쇱씠??span ?쒓굅
+  // 기존 문장 하이라이트 span 제거
   line.querySelectorAll('.sentence-reading').forEach(span => {
     const parent = span.parentNode;
     if (parent) {
@@ -2089,33 +2041,33 @@ function highlightSentenceInLine(line, sentenceIndex, sentences) {
     }
   });
   
-  // ???꾩껜 ?섏씠?쇱씠??
+  // 절 전체 하이라이트
   line.classList.add('reading');
   line.setAttribute('data-reading-sentence', sentenceIndex);
   line.scrollIntoView({block:'center', behavior:'smooth'});
   
-  // ???띿뒪??媛?몄삤湲?(?덈쾲???쒖쇅)
+  // 절 텍스트 가져오기 (절번호 제외)
   const verseNumEl = line.querySelector('.pv');
   const lineText = line.textContent || '';
   const verseNum = verseNumEl?.textContent || '';
   const textWithoutVerse = lineText.replace(verseNum, '').trim();
   
-  // ?꾩옱 臾몄옣 李얘린
+  // 현재 문장 찾기
   const targetSentence = sentences[sentenceIndex].trim();
   const sentenceStart = textWithoutVerse.indexOf(targetSentence);
   
   if (sentenceStart === -1) {
-    // 臾몄옣??李얠? 紐삵븳 寃쎌슦 ???꾩껜留??섏씠?쇱씠??
+    // 문장을 찾지 못한 경우 절 전체만 하이라이트
     return;
   }
   
-  // ???대? ?띿뒪???몃뱶 李얘린 (?덈쾲???쒖쇅)
+  // 절 내부 텍스트 노드 찾기 (절번호 제외)
   const walker = document.createTreeWalker(
     line,
     NodeFilter.SHOW_TEXT,
     {
       acceptNode: function(node) {
-        // ?덈쾲???몃뱶???쒖쇅
+        // 절번호 노드는 제외
         if (verseNumEl && (node.parentElement === verseNumEl || node.parentElement?.contains(verseNumEl))) {
           return NodeFilter.FILTER_REJECT;
         }
@@ -2133,20 +2085,20 @@ function highlightSentenceInLine(line, sentenceIndex, sentences) {
   let endNode = null;
   let endOffset = 0;
   
-  // 臾몄옣 ?쒖옉怨????꾩튂 李얘린
+  // 문장 시작과 끝 위치 찾기
   while (textNode = walker.nextNode()) {
     const text = textNode.textContent;
     const textLen = text.length;
     
     if (!foundStart && currentPos + textLen > sentenceStart) {
-      // 臾몄옣 ?쒖옉 ?꾩튂 李얠쓬
+      // 문장 시작 위치 찾음
       foundStart = true;
       startNode = textNode;
       startOffset = sentenceStart - currentPos;
     }
     
     if (foundStart && currentPos + textLen >= sentenceStart + targetSentence.length) {
-      // 臾몄옣 ???꾩튂 李얠쓬
+      // 문장 끝 위치 찾음
       endNode = textNode;
       endOffset = sentenceStart + targetSentence.length - currentPos;
       break;
@@ -2155,7 +2107,8 @@ function highlightSentenceInLine(line, sentenceIndex, sentences) {
     currentPos += textLen;
   }
   
-  // 臾몄옣??span?쇰줈 媛먯떥湲?  if (startNode && endNode) {
+  // 문장을 span으로 감싸기
+  if (startNode && endNode) {
     try {
       const range = document.createRange();
       range.setStart(startNode, startOffset);
@@ -2163,16 +2116,14 @@ function highlightSentenceInLine(line, sentenceIndex, sentences) {
       
       const span = document.createElement('span');
       span.className = 'sentence-reading';
-      span.style.background = 'color-mix(in hsl, var(--accent) 55%, black 0%)';
+      span.style.background = 'color-mix(in hsl, var(--accent) 25%, black 0%)';
       span.style.borderRadius = '4px';
       span.style.padding = '2px 0';
       span.style.transition = 'background 0.2s';
-      span.style.boxShadow = '0 0 0 1px color-mix(in hsl, var(--accent) 45%, black 0%)';
-      span.style.fontWeight = '600';
       
       range.surroundContents(span);
     } catch (e) {
-      // 踰붿쐞媛 ?щ윭 ?몃뱶??嫄몄퀜 ?덈뒗 寃쎌슦 extractContents ?ъ슜
+      // 범위가 여러 노드에 걸쳐 있는 경우 extractContents 사용
       try {
         const range = document.createRange();
         range.setStart(startNode, startOffset);
@@ -2181,17 +2132,15 @@ function highlightSentenceInLine(line, sentenceIndex, sentences) {
         const contents = range.extractContents();
         const span = document.createElement('span');
         span.className = 'sentence-reading';
-        span.style.background = 'color-mix(in hsl, var(--accent) 55%, black 0%)';
+        span.style.background = 'color-mix(in hsl, var(--accent) 25%, black 0%)';
         span.style.borderRadius = '4px';
         span.style.padding = '2px 0';
         span.style.transition = 'background 0.2s';
-        span.style.boxShadow = '0 0 0 1px color-mix(in hsl, var(--accent) 45%, black 0%)';
-        span.style.fontWeight = '600';
         span.appendChild(contents);
         range.insertNode(span);
       } catch (e2) {
-        // ?ㅽ뙣??寃쎌슦 ???꾩껜留??섏씠?쇱씠??
-        console.warn('臾몄옣 ?섏씠?쇱씠???ㅽ뙣:', e2);
+        // 실패한 경우 절 전체만 하이라이트
+        console.warn('문장 하이라이트 실패:', e2);
       }
     }
   }
@@ -2200,12 +2149,12 @@ function highlightSentenceInLine(line, sentenceIndex, sentences) {
 function speakVerseItemInScope(item, scope, onend){
   if(!READER.synth) return;
   
-  // ???띿뒪?몃? 臾몄옣?쇰줈 遺꾪븷
+  // 절 텍스트를 문장으로 분할
   const sentences = splitToSentences(item.text);
   const line = scope.querySelector(`.pline[data-verse="${item.verse}"]`);
   
   if (sentences.length === 0) {
-    // 臾몄옣???놁쑝硫?湲곗〈 諛⑹떇?濡?泥섎━
+    // 문장이 없으면 기존 방식대로 처리
     const u = new SpeechSynthesisUtterance(String(item.text));
     applyVoice(u);
     let done = false;
@@ -2225,7 +2174,7 @@ function speakVerseItemInScope(item, scope, onend){
     return;
   }
   
-  // 臾몄옣 ?⑥쐞濡??쎄린
+  // 문장 단위로 읽기
   let currentSentenceIndex = 0;
   let allDone = false;
   
@@ -2253,7 +2202,7 @@ function speakVerseItemInScope(item, scope, onend){
     };
     
     u.onstart = () => {
-      // ?꾩옱 臾몄옣 ?섏씠?쇱씠??
+      // 현재 문장 하이라이트
       if (line) {
         highlightSentenceInLine(line, currentSentenceIndex, sentences);
       }
@@ -2270,15 +2219,15 @@ function speakVerseItemInScope(item, scope, onend){
     READER.synth.speak(u);
   }
   
-  // 泥?臾몄옣遺???쒖옉
+  // 첫 문장부터 시작
   clearReadingHighlight(scope);
   speakNextSentence();
 }
 function toggleSpeakInline(book, chap, idx, paraDetailsEl, btnEl){
-  // speechSynthesis媛 ?놁쑝硫??ъ떆??
+  // speechSynthesis가 없으면 재시도
   if(!READER.synth) {
     READER.synth = window.speechSynthesis || null;
-    if(!READER.synth) return alert('??釉뚮씪?곗????뚯꽦?⑹꽦??吏?먰븯吏 ?딆뒿?덈떎.');
+    if(!READER.synth) return alert('이 브라우저는 음성합성을 지원하지 않습니다.');
   }
   const sameScope = READER.playing && READER.scope === paraDetailsEl;
   if(READER.playing && sameScope){ stopSpeakInline(); return; }
@@ -2324,129 +2273,7 @@ function stopSpeakInline(){
   updateInlineSpeakBtn();
   READER.scope = null; READER.btn = null;
 }
-function updateInlineSpeakBtn(){ if(READER.btn) READER.btn.textContent = READER.playing ? '以묒?' : '??룆'; }
-
-/* --------- Bible Reading STT (verse-by-verse) --------- */
-function _normalizeForMatch(text){
-  return String(text||'')
-    .toLowerCase()
-    .replace(/\s+/g,'')
-    .replace(/[^\p{L}\p{N}]/gu,'');
-}
-function _simScore(a,b){
-  const A=_normalizeForMatch(a), B=_normalizeForMatch(b);
-  if(!A || !B) return 0;
-  const minLen=Math.min(A.length,B.length), maxLen=Math.max(A.length,B.length);
-  let same=0;
-  for(let i=0;i<minLen;i++){ if(A[i]===B[i]) same++; }
-  // combo: ?꾩튂 ?쇱튂 鍮꾩쑉 vs 湲몄씠 寃뱀묠 鍮꾩쑉
-  return Math.max(same/maxLen, minLen/maxLen);
-}
-function _isVerseMatch(recognized, target){
-  const A=_normalizeForMatch(recognized), B=_normalizeForMatch(target);
-  if(!A || !B) return false;
-  // ?ы븿 愿怨꾧? ?щ㈃ 諛붾줈 ?깃났
-  if (A.length >= 10 && (B.includes(A) || A.includes(B))) return true;
-  return _simScore(A,B) >= 0.7;
-}
-function _listenHighlight(){
-  if(!LISTENER.scope) return;
-  clearReadingHighlight(LISTENER.scope);
-  const cur = LISTENER.q[LISTENER.idx];
-  if(!cur) return;
-  const line = LISTENER.scope.querySelector(`.pline[data-verse="${cur.verse}"]`);
-  if(line){
-    line.classList.add('reading');
-    line.scrollIntoView({block:'center', behavior:'smooth'});
-  }
-}
-function _advanceListening(){
-  LISTENER.idx++;
-  if(LISTENER.idx >= LISTENER.q.length){
-    stopListenInline(true);
-    status('紐⑤뱺 ?덉쓣 ?꾨즺?덉뒿?덈떎.');
-    return;
-  }
-  _listenHighlight();
-}
-function _handleListenResult(text){
-  if(!LISTENER.active || !text) return;
-  const cur = LISTENER.q[LISTENER.idx];
-  if(!cur){ stopListenInline(); return; }
-  if (_isVerseMatch(text, cur.text)) {
-    _advanceListening();
-  }
-}
-function _resolveStartIdxFromSelection(q){
-  try{
-    const sel = window.getSelection();
-    const anchor = sel?.anchorNode?.parentElement;
-    const line = anchor?.closest?.('.pline');
-    if(line && line.dataset.verse){
-      const v = parseInt(line.dataset.verse,10);
-      const found = q.findIndex(it => parseInt(it.verse,10)===v);
-      if(found>=0) return found;
-    }
-  }catch(_){}
-  return 0;
-}
-function toggleListenInline(book, chap, idx, paraDetailsEl, btnEl){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ alert('??釉뚮씪?곗????뚯꽦 ?몄떇??吏?먰븯吏 ?딆뒿?덈떎.'); return; }
-  if(LISTENER.active){
-    stopListenInline();
-    return;
-  }
-  // ?쎄린(TTS)? 寃뱀튂吏 ?딅룄濡??뺤?
-  if(READER.playing) stopSpeakInline();
-
-  const q = buildQueueFrom(book, chap, idx);
-  if(!q.length){ alert('?쎌쓣 ?덉씠 ?놁뒿?덈떎.'); return; }
-
-  const rec = new SR();
-  rec.lang = 'ko-KR';
-  rec.interimResults = true;
-  rec.continuous = true;
-
-  rec.onresult = (e)=>{
-    let txt = '';
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      const r = e.results[i];
-      if(!r || !r[0]) continue;
-      txt += r[0].transcript || '';
-      if(r.isFinal) break;
-    }
-    if(txt.trim()) _handleListenResult(txt);
-  };
-  rec.onend = ()=>{ if(LISTENER.active){ try{ rec.start(); }catch(_){ stopListenInline(); } } };
-  rec.onerror = (e)=>{
-    console.warn('[listenInline] STT error', e);
-    if(['not-allowed','service-not-allowed'].includes(e?.error)){ stopListenInline(); alert('留덉씠??沅뚰븳???덉슜??二쇱꽭??'); }
-  };
-
-  LISTENER = {
-    active:true, rec,
-    scope: paraDetailsEl,
-    btn: btnEl,
-    q,
-    idx: _resolveStartIdxFromSelection(q),
-    book, chap, paraIdx: idx
-  };
-
-  try{ rec.start(); }catch(err){ console.warn('SpeechRecognition start ?ㅽ뙣', err); stopListenInline(); return; }
-  if(LISTENER.btn) LISTENER.btn.textContent = '?뚯꽦以묒?';
-  _listenHighlight();
-  status('?깃꼍 ?쎄린 ?뚯꽦 ?몄떇???쒖옉?덉뒿?덈떎. ?꾩옱 ?덉쓣 ?곕씪 ?쎌뼱 二쇱꽭??');
-}
-function stopListenInline(silent){
-  if(LISTENER.rec){
-    try{ LISTENER.rec.onresult = LISTENER.rec.onend = LISTENER.rec.onerror = null; LISTENER.rec.stop(); }catch(_){}
-  }
-  if(LISTENER.scope) clearReadingHighlight(LISTENER.scope);
-  if(LISTENER.btn) LISTENER.btn.textContent = '?뚯꽦?쎄린';
-  LISTENER = { active:false, rec:null, scope:null, btn:null, q:[], idx:0, book:null, chap:null, paraIdx:null };
-  if(!silent) status('?깃꼍 ?쎄린 ?뚯꽦 ?몄떇??醫낅즺?덉뒿?덈떎.');
-}
+function updateInlineSpeakBtn(){ if(READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독'; }
 
 function goToNextParagraphInline(book, chap, idx){
   const chObj = BIBLE.books[book][chap];
@@ -2466,7 +2293,7 @@ function goToNextParagraphInline(book, chap, idx){
 
   const paraEls = chapEl.querySelectorAll(':scope > .paras > details.para');
 
-  if (READER.btn) READER.btn.textContent = '??룆';
+  if (READER.btn) READER.btn.textContent = '낭독';
 
   if (idx < chObj.paras.length - 1){
     const nextEl = paraEls[idx + 1];
@@ -2478,7 +2305,7 @@ function goToNextParagraphInline(book, chap, idx){
       CURRENT.paraIdx = idx + 1;
       READER.scope = nextEl;
       READER.btn = nextEl.querySelector('.speakBtn');
-      if (READER.btn) READER.btn.textContent = READER.playing ? '以묒?' : '??룆';
+      if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독';
       return true;
     }
   }
@@ -2499,7 +2326,7 @@ function goToNextParagraphInline(book, chap, idx){
 
         READER.scope = nextParaEl;
         READER.btn = nextParaEl?.querySelector('.speakBtn') || null;
-        if (READER.btn) READER.btn.textContent = READER.playing ? '以묒?' : '??룆';
+        if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독';
         return true;
       }
     }
@@ -2524,7 +2351,7 @@ function goToNextParagraphInline(book, chap, idx){
 
         READER.scope = nextParaEl;
         READER.btn = nextParaEl.querySelector('.speakBtn');
-        if (READER.btn) READER.btn.textContent = READER.playing ? '以묒?' : '??룆';
+        if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독';
         return true;
       }
     }
@@ -2535,7 +2362,7 @@ function goToNextParagraphInline(book, chap, idx){
 /* --------- Sermon / Context Editors --------- */
 function getSermonMap(){ 
   const data = loadState(STORAGE_SERMON, {});
-  // 硫뷀? ?꾨뱶(_version, _savedAt ?? ?쒓굅?섍퀬 ?ㅼ젣 ?곗씠?곕쭔 諛섑솚
+  // 메타 필드(_version, _savedAt 등) 제거하고 실제 데이터만 반환
   if (data && typeof data === 'object' && !Array.isArray(data)) {
     const { _version, _savedAt, _migrated, _migratedFrom, _migratedAt, ...cleanData } = data;
     return cleanData;
@@ -2544,11 +2371,11 @@ function getSermonMap(){
 }
 function setSermonMap(o, immediate = false){ 
   if (immediate) {
-    // 利됱떆 ???(debounce ?놁씠)
+    // 즉시 저장 (debounce 없이)
     const saved = saveState(STORAGE_SERMON, o, { silent: false });
     if (!saved) {
-      console.error('[setSermonMap] ????ㅽ뙣, ?ъ떆??以?..');
-      // ?ъ떆??
+      console.error('[setSermonMap] 저장 실패, 재시도 중...');
+      // 재시도
       setTimeout(() => {
         saveState(STORAGE_SERMON, o, { silent: false });
       }, 100);
@@ -2558,8 +2385,8 @@ function setSermonMap(o, immediate = false){
   } else {
     const saved = saveState(STORAGE_SERMON, o);
     if (!saved) {
-      console.error('[setSermonMap] ????ㅽ뙣, ?ъ떆??以?..');
-      // ?ъ떆??
+      console.error('[setSermonMap] 저장 실패, 재시도 중...');
+      // 재시도
       setTimeout(() => {
         saveState(STORAGE_SERMON, o);
       }, 100);
@@ -2571,20 +2398,20 @@ function setSermonMap(o, immediate = false){
 function getDocMap(storageKey){ return loadState(storageKey, {}); }
 function setDocMap(storageKey, obj){ saveState(storageKey, obj); }
 
-/* ???꾨줈洹몃옩 ?쒖옉 ????λ맂 ?ㅺ탳紐⑸줉 ?먮룞 ?쒖떆 */
+/* ✅ 프로그램 시작 시 저장된 설교목록 자동 표시 */
 function restoreSermonListOnStartup(){
   try {
-    // 留덉?留됱쑝濡?蹂?paraId 媛?몄삤湲?
+    // 마지막으로 본 paraId 가져오기
     const lastParaId = loadState(STORAGE_LAST_SERMON_PARA, null);
     if (!lastParaId || typeof lastParaId !== 'string') {
-      console.log('[restoreSermonListOnStartup] ??λ맂 paraId媛 ?놁뒿?덈떎.');
+      console.log('[restoreSermonListOnStartup] 저장된 paraId가 없습니다.');
       return;
     }
     
-    // paraId ?뚯떛: "book|chap|ref"
+    // paraId 파싱: "book|chap|ref"
     const parts = lastParaId.split('|');
     if (parts.length < 3) {
-      console.log('[restoreSermonListOnStartup] ?섎せ??paraId ?뺤떇:', lastParaId);
+      console.log('[restoreSermonListOnStartup] 잘못된 paraId 형식:', lastParaId);
       return;
     }
     
@@ -2592,39 +2419,39 @@ function restoreSermonListOnStartup(){
     const chap = parseInt(chapStr, 10);
     
     if (!book || !Number.isFinite(chap) || !BIBLE?.books?.[book]?.[chap]) {
-      console.log('[restoreSermonListOnStartup] ?좏슚?섏? ?딆? paraId:', lastParaId);
+      console.log('[restoreSermonListOnStartup] 유효하지 않은 paraId:', lastParaId);
       return;
     }
     
-    // ?대떦 ?μ쓽 ?⑤씫 李얘린
+    // 해당 장의 단락 찾기
     const paras = BIBLE.books[book][chap].paras || [];
     const paraIdx = paras.findIndex(p => p.ref === ref);
     
     if (paraIdx === -1) {
-      console.log('[restoreSermonListOnStartup] ?⑤씫??李얠쓣 ???놁뒿?덈떎:', lastParaId);
+      console.log('[restoreSermonListOnStartup] 단락을 찾을 수 없습니다:', lastParaId);
       return;
     }
     
-    // CURRENT ?곹깭 ?ㅼ젙
+    // CURRENT 상태 설정
     CURRENT.book = book;
     CURRENT.chap = chap;
     CURRENT.paraIdx = paraIdx;
     CURRENT.paraId = lastParaId;
     
-    // ?ㅺ탳紐⑸줉 ?뺤씤
+    // 설교목록 확인
     const map = getSermonMap();
     const arr = map[lastParaId] || [];
     
     if (arr.length === 0) {
-      console.log('[restoreSermonListOnStartup] ?대떦 paraId???ㅺ탳媛 ?놁뒿?덈떎:', lastParaId);
+      console.log('[restoreSermonListOnStartup] 해당 paraId에 설교가 없습니다:', lastParaId);
       return;
     }
     
-    console.log('[restoreSermonListOnStartup] ?ㅺ탳紐⑸줉 ?먮룞 ?쒖떆:', lastParaId, '?ㅺ탳 媛쒖닔:', arr.length);
+    console.log('[restoreSermonListOnStartup] 설교목록 자동 표시:', lastParaId, '설교 개수:', arr.length);
     
-    // ?몃━媛 ?꾩쟾??鍮뚮뱶?????ㅺ탳紐⑸줉 ?쒖떆
+    // 트리가 완전히 빌드된 후 설교목록 표시
     setTimeout(() => {
-      // ?대떦 ?⑤씫 ?닿린
+      // 해당 단락 열기
       const paraEl = document.querySelector(`details.para summary .ptitle[data-book="${book}"][data-ch="${chap}"][data-idx="${paraIdx}"]`);
       if (paraEl) {
         const paraDetails = paraEl.closest('details.para');
@@ -2633,119 +2460,119 @@ function restoreSermonListOnStartup(){
         }
       }
       
-      // ?ㅺ탳紐⑸줉 紐⑤떖 ?닿린
+      // 설교목록 모달 열기
       openSermonListModal();
-    }, 500); // ?몃━ 鍮뚮뱶 ?꾨즺 ?湲?
+    }, 500); // 트리 빌드 완료 대기
     
   } catch (e) {
-    console.error('[restoreSermonListOnStartup] ?ㅻ쪟:', e);
+    console.error('[restoreSermonListOnStartup] 오류:', e);
   }
 }
 
-/* ???ㅺ탳紐⑸줉 紐⑤떖 ?닿린 */
+/* ✅ 설교목록 모달 열기 */
 function openSermonListModal(){
-  // CURRENT ?곹깭 ?뺤씤 諛??숆린??
+  // CURRENT 상태 확인 및 동기화
   if (!CURRENT.book || !Number.isFinite(CURRENT.chap) || !Number.isFinite(CURRENT.paraIdx)) {
     if (!syncCurrentFromOpen()) {
-      alert('?⑤씫??癒쇱? ?좏깮??二쇱꽭??');
+      alert('단락을 먼저 선택해 주세요.');
       return;
     }
   }
 
   const para = BIBLE?.books?.[CURRENT.book]?.[CURRENT.chap]?.paras?.[CURRENT.paraIdx];
   if (!para) {
-    alert('?좏깮???⑤씫??李얠쓣 ???놁뒿?덈떎.');
+    alert('선택한 단락을 찾을 수 없습니다.');
     return;
   }
   
-  // paraId ?뺤떎???ㅼ젙
+  // paraId 확실히 설정
   CURRENT.paraId = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
   
-  // 留덉?留됱쑝濡?蹂?paraId ???
+  // 마지막으로 본 paraId 저장
   saveState(STORAGE_LAST_SERMON_PARA, CURRENT.paraId);
 
-  document.getElementById('modalTitle').textContent = '?ㅺ탳紐⑸줉';
-  modalRef.textContent = `${CURRENT.book} ${CURRENT.chap}??쨌 ${para.title || para.ref} (${para.ref})`;
+  document.getElementById('modalTitle').textContent = '설교목록';
+  modalRef.textContent = `${CURRENT.book} ${CURRENT.chap}장 · ${para.title || para.ref} (${para.ref})`;
   
   sermonEditor.style.display = 'none';
   sermonEditor.classList.add('context-editor');
-  // aria-hidden??癒쇱? false濡??ㅼ젙????display瑜?蹂寃?(?묎렐??媛쒖꽑)
+  // aria-hidden을 먼저 false로 설정한 후 display를 변경 (접근성 개선)
   modalWrap.setAttribute('aria-hidden','false');
   modalWrap.style.display = 'flex';
   modalFooterNew.style.display = '';
-  // ?뚮줈???대컮 ?④?
+  // 플로팅 툴바 숨김
   if (window.__hideFloatingToolbar) window.__hideFloatingToolbar();
 
-  // localStorage?먯꽌 ?ㅺ탳紐⑸줉 ?뺣낫瑜?媛?몄????뚮뜑留?
+  // localStorage에서 설교목록 정보를 가져와서 렌더링
   renderSermonList();
   
-  // 紐⑤떖???대┛ ???ъ빱?ㅻ? ?ㅼ젙?섍린 ?꾩뿉 aria-hidden???뺤떎???곸슜?섎룄濡?蹂댁옣
+  // 모달이 열린 후 포커스를 설정하기 전에 aria-hidden이 확실히 적용되도록 보장
   requestAnimationFrame(() => {
     if (modalWrap.style.display === 'flex') {
       modalWrap.setAttribute('aria-hidden','false');
     }
   });
   
-  // 紐⑤떖???대┛ ???ъ빱?ㅻ? 紐⑤떖 ?대?濡??대룞 (?묎렐??媛쒖꽑)
+  // 모달이 열린 후 포커스를 모달 내부로 이동 (접근성 개선)
   setTimeout(() => {
     const firstFocusable = modalWrap.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
     if (firstFocusable) firstFocusable.focus();
   }, 0);
 }
 
-/* ???ㅺ탳 ?몄쭛湲??닿린 (?ㅺ탳蹂닿린 踰꾪듉?먯꽌 ?몄텧) */
+/* ✅ 설교 편집기 열기 (설교보기 버튼에서 호출) */
 function openSermonEditorDirectly(sermonIdx = 0){
   if (!CURRENT.book || !Number.isFinite(CURRENT.chap) || !Number.isFinite(CURRENT.paraIdx)) {
     if (!syncCurrentFromOpen()) {
-      alert('?⑤씫??癒쇱? ?좏깮??二쇱꽭??');
+      alert('단락을 먼저 선택해 주세요.');
       return;
     }
   }
 
   const para = BIBLE?.books?.[CURRENT.book]?.[CURRENT.chap]?.paras?.[CURRENT.paraIdx];
   if (!para) {
-    alert('?좏깮???⑤씫??李얠쓣 ???놁뒿?덈떎.');
+    alert('선택한 단락을 찾을 수 없습니다.');
     return;
   }
   CURRENT.paraId = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
 
-  // ?ㅺ탳 ?곗씠???뺤씤
+  // 설교 데이터 확인
   const map = getSermonMap();
   const arr = map[CURRENT.paraId] || [];
   const existingSermon = arr[sermonIdx];
 
-  document.getElementById('modalTitle').textContent = '?ㅺ탳 ?몄쭛';
-  // 蹂몃Ц ?뺣낫 ?④? (?ㅺ탳蹂닿린?먯꽌???쒖떆?섏? ?딆쓬)
+  document.getElementById('modalTitle').textContent = '설교 편집';
+  // 본문 정보 숨김 (설교보기에서는 표시하지 않음)
   modalRef.textContent = '';
   modalRef.style.display = 'none';
   sermonList.innerHTML = '';
   sermonEditor.style.display = '';
   sermonEditor.classList.add('context-editor');
   sermonEditor.dataset.ctxType = '';
-  sermonEditor.dataset.editing = existingSermon ? String(sermonIdx) : ''; // ?몄쭛 紐⑤뱶 ?ㅼ젙
+  sermonEditor.dataset.editing = existingSermon ? String(sermonIdx) : ''; // 편집 모드 설정
   
-  // aria-hidden??癒쇱? false濡??ㅼ젙????display瑜?蹂寃?(?묎렐??媛쒖꽑)
+  // aria-hidden을 먼저 false로 설정한 후 display를 변경 (접근성 개선)
   modalWrap.setAttribute('aria-hidden','false');
   modalWrap.style.display = 'flex';
   modalFooterNew.style.display = 'none';
-  // ?뚮줈???대컮 ?④?
+  // 플로팅 툴바 숨김
   if (window.__hideFloatingToolbar) window.__hideFloatingToolbar();
 
-  // ?쒕ぉ ?낅젰 ?꾨뱶 ?쒖떆
+  // 제목 입력 필드 표시
   sermonTitle.style.display = '';
   
-  // 紐⑤떖???대┛ ???ъ빱?ㅻ? ?ㅼ젙?섍린 ?꾩뿉 aria-hidden???뺤떎???곸슜?섎룄濡?蹂댁옣
+  // 모달이 열린 후 포커스를 설정하기 전에 aria-hidden이 확실히 적용되도록 보장
   requestAnimationFrame(() => {
     if (modalWrap.style.display === 'flex') {
       modalWrap.setAttribute('aria-hidden','false');
     }
   });
   
-  // 硫뷀? ?꾨뱶 ?④? (?ㅺ탳蹂닿린?먯꽌???쒖떆?섏? ?딆쓬)
+  // 메타 필드 숨김 (설교보기에서는 표시하지 않음)
   const metaFields = document.getElementById('sermonMetaFields');
   if (metaFields) metaFields.style.display = 'none';
   
-  // 湲곗〈 ?ㅺ탳 ?댁슜 濡쒕뱶 ?먮뒗 鍮??몄쭛湲?
+  // 기존 설교 내용 로드 또는 빈 편집기
   if (existingSermon) {
     sermonTitle.value = existingSermon.title || '';
     setBodyHTML(existingSermon.body || '');
@@ -2754,59 +2581,59 @@ function openSermonEditorDirectly(sermonIdx = 0){
     setBodyHTML('');
   }
   
-  // ?깃뎄 ?쎌엯 踰꾪듉 ?④? (?ㅺ탳蹂닿린?먯꽌???ъ슜?섏? ?딆쓬)
+  // 성구 삽입 버튼 숨김 (설교보기에서는 사용하지 않음)
   const insertVerseBtn = document.getElementById('insertVerseBtn');
   if (insertVerseBtn) {
     insertVerseBtn.style.display = 'none';
   }
   
-  // 紐⑤떖???대┛ ???ъ빱?ㅻ? 紐⑤떖 ?대?濡??대룞 (?묎렐??媛쒖꽑)
+  // 모달이 열린 후 포커스를 모달 내부로 이동 (접근성 개선)
   setTimeout(() => {
     const firstFocusable = modalWrap.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
     if (firstFocusable) firstFocusable.focus();
   }, 0);
 }
 
-/* ???깃뎄 ?쎌엯 湲곕뒫 */
+/* ✅ 성구 삽입 기능 */
 function setupInsertVerseButton(){
   const insertBtn = document.getElementById('insertVerseBtn');
   if (!insertBtn) return;
   
-  // 湲곗〈 ?대깽??由ъ뒪???쒓굅 ???덈줈 異붽?
+  // 기존 이벤트 리스너 제거 후 새로 추가
   const newBtn = insertBtn.cloneNode(true);
   insertBtn.parentNode.replaceChild(newBtn, insertBtn);
   
   newBtn.addEventListener('click', () => {
     if (!CURRENT.book || !Number.isFinite(CURRENT.chap) || !Number.isFinite(CURRENT.paraIdx)) {
-      alert('?⑤씫??癒쇱? ?좏깮??二쇱꽭??');
+      alert('단락을 먼저 선택해 주세요.');
       return;
     }
     
     const para = BIBLE?.books?.[CURRENT.book]?.[CURRENT.chap]?.paras?.[CURRENT.paraIdx];
     if (!para) {
-      alert('?좏깮???⑤씫??李얠쓣 ???놁뒿?덈떎.');
+      alert('선택한 단락을 찾을 수 없습니다.');
       return;
     }
     
-    // ?깃뎄 ?띿뒪???앹꽦
+    // 성구 텍스트 생성
     const verses = para.verses || [];
     let verseText = `${CURRENT.book} ${CURRENT.chap}:${para.ref}\n\n`;
     verses.forEach(([v, t]) => {
       verseText += `${v} ${t}\n`;
     });
     
-    // ?꾩옱 而ㅼ꽌 ?꾩튂???쎌엯
+    // 현재 커서 위치에 삽입
     const body = sermonBody;
     if (!body) return;
     
     if (isRTE()) {
-      // RTE 紐⑤뱶
+      // RTE 모드
       const sel = window.getSelection();
       if (sel.rangeCount > 0) {
         const range = sel.getRangeAt(0);
         range.deleteContents();
         
-        // 以꾨컮轅덉쓣 <br>濡?蹂?섑븯???쎌엯
+        // 줄바꿈을 <br>로 변환하여 삽입
         const lines = verseText.split('\n');
         lines.forEach((line, idx) => {
           if (line.trim()) {
@@ -2822,12 +2649,12 @@ function setupInsertVerseButton(){
           }
         });
         
-        // 而ㅼ꽌瑜??쎌엯???띿뒪???ㅻ줈 ?대룞
+        // 커서를 삽입된 텍스트 뒤로 이동
         range.collapse(false);
         sel.removeAllRanges();
         sel.addRange(range);
       } else {
-        // ?좏깮 ?곸뿭???놁쑝硫??앹뿉 異붽?
+        // 선택 영역이 없으면 끝에 추가
         const lines = verseText.split('\n');
         lines.forEach((line) => {
           if (line.trim()) {
@@ -2839,7 +2666,7 @@ function setupInsertVerseButton(){
       }
       body.focus();
     } else {
-      // ?띿뒪???곸뿭 紐⑤뱶
+      // 텍스트 영역 모드
       const start = body.selectionStart || 0;
       const end = body.selectionEnd || 0;
       const text = body.value;
@@ -2850,11 +2677,11 @@ function setupInsertVerseButton(){
   });
 }
 
-/* ??湲곗〈 紐⑤떖 湲곕컲 ?ㅺ탳 ?쒖뒪?쒖? ?쒓굅??- openSermonEditorDirectly ?ъ슜 */
+/* ✅ 기존 모달 기반 설교 시스템은 제거됨 - openSermonEditorDirectly 사용 */
 el('closeModal').onclick = ()=>{ 
-  // display瑜?癒쇱? none?쇰줈 ?ㅼ젙????aria-hidden??true濡??ㅼ젙 (?묎렐??媛쒖꽑)
+  // display를 먼저 none으로 설정한 후 aria-hidden을 true로 설정 (접근성 개선)
   modalWrap.style.display='none'; 
-  // 紐⑤떖???ㅼ젣濡??ロ엺 ?꾩뿉留?aria-hidden??true濡??ㅼ젙
+  // 모달이 실제로 닫힌 후에만 aria-hidden을 true로 설정
   requestAnimationFrame(() => {
     if (modalWrap.style.display === 'none') {
       modalWrap.setAttribute('aria-hidden','true');
@@ -2865,18 +2692,18 @@ el('closeModal').onclick = ()=>{
 
 function openSingleDocEditor(kind){
   if (!CURRENT.book || !Number.isFinite(CURRENT.chap) || !Number.isFinite(CURRENT.paraIdx)) {
-    if (!syncCurrentFromOpen()) { alert('?⑤씫??癒쇱? ?좏깮??二쇱꽭??'); return; }
+    if (!syncCurrentFromOpen()) { alert('단락을 먼저 선택해 주세요.'); return; }
   }
-  if (!BIBLE) { alert('?깃꼍 ?곗씠?곌? 濡쒕뱶?섏? ?딆븯?듬땲??'); return; }
+  if (!BIBLE) { alert('성경 데이터가 로드되지 않았습니다.'); return; }
 
   const para = BIBLE.books[CURRENT.book][CURRENT.chap].paras[CURRENT.paraIdx];
   const pid  = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
 
   const titlePrefix =
-    kind==='unit'       ? '?⑥쐞?깃꼍??留λ씫' :
-    kind==='whole'      ? '?꾩껜?깃꼍??留λ씫' :
-    kind==='commentary' ? '二쇱꽍' :
-                           '?댁슜?붿빟';
+    kind==='unit'       ? '단위성경속 맥락' :
+    kind==='whole'      ? '전체성경속 맥락' :
+    kind==='commentary' ? '주석' :
+                           '내용요약';
 
   const key =
     kind==='unit'       ? STORAGE_UNIT_CTX :
@@ -2886,18 +2713,18 @@ function openSingleDocEditor(kind){
 
   const map = getDocMap(key);
   const doc = map[pid] || {
-    body:  (kind==='summary' ? '?듭떖 ?댁슜??媛꾧껐?섍쾶 ?붿빟???곸뼱二쇱꽭??' : ''),
+    body:  (kind==='summary' ? '핵심 내용을 간결하게 요약해 적어주세요.' : ''),
     images: [], date:''
   };
-  modalRef.textContent = `${CURRENT.book} ${CURRENT.chap}??쨌 ${para.title||para.ref} (${para.ref}) ??${titlePrefix}`;
+  modalRef.textContent = `${CURRENT.book} ${CURRENT.chap}장 · ${para.title||para.ref} (${para.ref}) — ${titlePrefix}`;
   sermonList.innerHTML = '';
   sermonEditor.style.display = '';
   sermonEditor.classList.add('context-editor');
-  // aria-hidden??癒쇱? false濡??ㅼ젙????display瑜?蹂寃?(?묎렐??媛쒖꽑)
+  // aria-hidden을 먼저 false로 설정한 후 display를 변경 (접근성 개선)
   modalWrap.setAttribute('aria-hidden','false');
   modalWrap.style.display = 'flex';
   modalFooterNew.style.display = 'none';
-  // ?뚮줈???대컮???⑤씫?깃꼍 ?몄쭛湲??대??먯꽌 ?ъ슜 媛?ν븯?꾨줉 ?좎?
+  // 플로팅 툴바는 단락성경 편집기 내부에서 사용 가능하도록 유지
 
   sermonTitle.value = doc.title || '';
   setBodyHTML(doc.body || '');
@@ -2905,8 +2732,8 @@ function openSingleDocEditor(kind){
   sermonEditor.dataset.editing = '';
   sermonEditor.dataset.ctxType = kind;
   
-  // 紐⑤떖???대┛ ???ъ빱?ㅻ? 紐⑤떖 ?대?濡??대룞 (?묎렐??媛쒖꽑)
-  // aria-hidden???뺤떎???곸슜?????ъ빱?ㅻ? ?ㅼ젙
+  // 모달이 열린 후 포커스를 모달 내부로 이동 (접근성 개선)
+  // aria-hidden이 확실히 적용된 후 포커스를 설정
   requestAnimationFrame(() => {
     if (modalWrap.style.display === 'flex') {
       modalWrap.setAttribute('aria-hidden','false');
@@ -2922,21 +2749,21 @@ function openSingleDocEditor(kind){
     aiBtn.style.display = (kind === 'unit') ? '' : 'none';
     aiBtn.onclick = null;
     if (kind === 'unit') {
-      aiBtn.onclick = async ()=>{ /* ?좏깮: AI ?몃뱾??*/ };
+      aiBtn.onclick = async ()=>{ /* 선택: AI 핸들러 */ };
     }
   }
 }
 
 function openBookDocEditor(mode, book){
   if (!book) {
-    alert('梨??뺣낫瑜?李얠쓣 ???놁뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??');
+    alert('책 정보를 찾을 수 없습니다. 다시 시도해 주세요.');
     return;
   }
 
   const titlePrefix =
-    mode === 'basic'   ? '湲곕낯?댄빐' :
-    mode === 'struct'  ? '?댁슜援ъ“' :
-                         '硫붿꽭吏?붿빟';
+    mode === 'basic'   ? '기본이해' :
+    mode === 'struct'  ? '내용구조' :
+                         '메세지요약';
 
   const key =
     mode === 'basic'   ? STORAGE_BOOK_BASIC :
@@ -2948,31 +2775,31 @@ function openBookDocEditor(mode, book){
     title: '',
     body:
       mode === 'basic'
-        ? '??梨낆쓽 ??궗?겶룸같寃쎌쟻쨌?좏븰??湲곕낯 ?댄빐瑜??뺣━??二쇱꽭??'
+        ? '이 책의 역사적·배경적·신학적 기본 이해를 정리해 주세요.'
       : mode === 'struct'
-        ? '??梨낆쓽 ??援ъ“(?⑤씫 ?먮쫫, ?듭떖 二쇱젣)瑜??뺣━??二쇱꽭??'
-        : '??梨낆쓽 ?듭떖 硫붿떆吏? ?곸슜 ?ъ씤?몃? 媛꾧껐?섍쾶 ?붿빟??二쇱꽭??',
+        ? '이 책의 큰 구조(단락 흐름, 핵심 주제)를 정리해 주세요.'
+        : '이 책의 핵심 메시지와 적용 포인트를 간결하게 요약해 주세요.',
     images: [],
     date: ''
   };
 
-  // ?뵻 紐⑤떖/?먮뵒??UI ?명똿 (?댁슜?먮쫫 ?먮뵒?곗? ?숈씪???ㅽ???
-  modalRef.textContent = `${book} ??${titlePrefix}`;
+  // 🔹 모달/에디터 UI 세팅 (내용흐름 에디터와 동일한 스타일)
+  modalRef.textContent = `${book} — ${titlePrefix}`;
   sermonList.innerHTML = '';
   sermonEditor.style.display = '';
   sermonEditor.classList.add('context-editor');
-  // aria-hidden??癒쇱? false濡??ㅼ젙????display瑜?蹂寃?(?묎렐??媛쒖꽑)
+  // aria-hidden을 먼저 false로 설정한 후 display를 변경 (접근성 개선)
   modalWrap.setAttribute('aria-hidden','false');
   modalWrap.style.display = 'flex';
   modalFooterNew.style.display = 'none';
-  // ?뚮줈???대컮???몄쭛湲??대? ?좏깮 ???쒖떆?섎룄濡??좎?
-  // (珥덇린 ?곹깭留??④?, ?섏쨷???띿뒪???좏깮?섎㈃ ?쒖떆??
+  // 플로팅 툴바는 편집기 내부 선택 시 표시되도록 유지
+  // (초기 상태만 숨김, 나중에 텍스트 선택하면 표시됨)
   if (window.__hideFloatingToolbar) window.__hideFloatingToolbar();
 
   sermonTitle.value = doc.title || '';
   
-  // 紐⑤떖???대┛ ???ъ빱?ㅻ? 紐⑤떖 ?대?濡??대룞 (?묎렐??媛쒖꽑)
-  // aria-hidden???뺤떎???곸슜?????ъ빱?ㅻ? ?ㅼ젙
+  // 모달이 열린 후 포커스를 모달 내부로 이동 (접근성 개선)
+  // aria-hidden이 확실히 적용된 후 포커스를 설정
   requestAnimationFrame(() => {
     if (modalWrap.style.display === 'flex') {
       modalWrap.setAttribute('aria-hidden','false');
@@ -2984,12 +2811,12 @@ function openBookDocEditor(mode, book){
   });
   setBodyHTML(doc.body || '');
 
-  // ?뵻 ???援щ텇??硫뷀??곗씠??
+  // 🔹 저장 구분용 메타데이터
   sermonEditor.dataset.editing = '';
   sermonEditor.dataset.ctxType  = `book-${mode}`; // book-basic / book-struct / book-summary
   sermonEditor.dataset.bookName = book;
 
-  // ?뵻 AI 踰꾪듉? 梨??⑥쐞?먯꽌???ъ슜 ????
+  // 🔹 AI 버튼은 책 단위에서는 사용 안 함
   const aiBtn = document.getElementById('aiFill');
   if (aiBtn) {
     aiBtn.style.display = 'none';
@@ -2997,12 +2824,12 @@ function openBookDocEditor(mode, book){
   }
 }
 
-/* ???ㅺ탳紐⑸줉 ?뚮뜑留?(localStorage?먯꽌 ?ㅺ탳紐⑸줉 ?뺣낫 媛?몄????쒖떆) */
+/* ✅ 설교목록 렌더링 (localStorage에서 설교목록 정보 가져와서 표시) */
 function renderSermonList(){
-  // CURRENT.paraId媛 ?놁쑝硫??ㅼ젙 ?쒕룄
+  // CURRENT.paraId가 없으면 설정 시도
   if (!CURRENT.paraId) {
     if (!syncCurrentFromOpen()) {
-      sermonList.innerHTML = '<div class="muted" style="padding:14px">?⑤씫??癒쇱? ?좏깮??二쇱꽭??</div>';
+      sermonList.innerHTML = '<div class="muted" style="padding:14px">단락을 먼저 선택해 주세요.</div>';
       return;
     }
     const para = BIBLE?.books?.[CURRENT.book]?.[CURRENT.chap]?.paras?.[CURRENT.paraIdx];
@@ -3012,92 +2839,92 @@ function renderSermonList(){
   }
   
   if (!CURRENT.paraId) {
-    sermonList.innerHTML = '<div class="muted" style="padding:14px">?⑤씫 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.</div>';
+    sermonList.innerHTML = '<div class="muted" style="padding:14px">단락 정보를 찾을 수 없습니다.</div>';
     return;
   }
   
-  // localStorage?먯꽌 ?ㅺ탳紐⑸줉 ?뺣낫 媛?몄삤湲?
+  // localStorage에서 설교목록 정보 가져오기
   let arr = [];
   try {
-    const map = getSermonMap(); // localStorage?먯꽌 吏곸젒 媛?몄샂
+    const map = getSermonMap(); // localStorage에서 직접 가져옴
     
-    // ?곗씠???좏슚??寃??
+    // 데이터 유효성 검사
     if (!map || typeof map !== 'object') {
-      console.warn('[renderSermonList] localStorage?먯꽌 ?ㅺ탳 留듭쓣 媛?몄삱 ???놁뒿?덈떎. 鍮?媛앹껜濡?珥덇린?뷀빀?덈떎.');
-      sermonList.innerHTML = '<div class="muted" style="padding:14px">?ㅺ탳媛 ?놁뒿?덈떎. "???ㅺ탳紐⑸줉" 踰꾪듉???뚮윭 ?ㅺ탳瑜??묒꽦?섏꽭??</div>';
+      console.warn('[renderSermonList] localStorage에서 설교 맵을 가져올 수 없습니다. 빈 객체로 초기화합니다.');
+      sermonList.innerHTML = '<div class="muted" style="padding:14px">설교가 없습니다. "새 설교목록" 버튼을 눌러 설교를 작성하세요.</div>';
       return;
     }
     
-    // CURRENT.paraId濡??ㅺ탳 諛곗뿴 媛?몄삤湲?(localStorage?먯꽌 吏곸젒 媛?몄샂)
+    // CURRENT.paraId로 설교 배열 가져오기 (localStorage에서 직접 가져옴)
     arr = Array.isArray(map[CURRENT.paraId]) ? map[CURRENT.paraId] : [];
     
-    console.log('[renderSermonList] localStorage?먯꽌 媛?몄삩 ?ㅺ탳紐⑸줉 - paraId:', CURRENT.paraId, '?ㅺ탳 媛쒖닔:', arr.length);
+    console.log('[renderSermonList] localStorage에서 가져온 설교목록 - paraId:', CURRENT.paraId, '설교 개수:', arr.length);
     
     sermonList.innerHTML = '';
 
-    // ?ㅺ탳媛 ?놁쑝硫??녿뒗 寃껋쑝濡??쒖떆
+    // 설교가 없으면 없는 것으로 표시
     if(arr.length === 0){
-      sermonList.innerHTML = '<div class="muted" style="padding:14px">?ㅺ탳媛 ?놁뒿?덈떎. "???ㅺ탳紐⑸줉" 踰꾪듉???뚮윭 ?ㅺ탳瑜??묒꽦?섏꽭??</div>';
+      sermonList.innerHTML = '<div class="muted" style="padding:14px">설교가 없습니다. "새 설교목록" 버튼을 눌러 설교를 작성하세요.</div>';
       return;
     }
   } catch (e) {
-    console.error('[renderSermonList] localStorage?먯꽌 ?ㅺ탳紐⑸줉??媛?몄삤??以??ㅻ쪟 諛쒖깮:', e);
-    sermonList.innerHTML = '<div class="muted" style="padding:14px">?ㅺ탳 ?곗씠?곕? 遺덈윭?????놁뒿?덈떎.</div>';
+    console.error('[renderSermonList] localStorage에서 설교목록을 가져오는 중 오류 발생:', e);
+    sermonList.innerHTML = '<div class="muted" style="padding:14px">설교 데이터를 불러올 수 없습니다.</div>';
     return;
   }
 
-  // localStorage?먯꽌 媛?몄삩 ?ㅺ탳紐⑸줉 ?쒖떆
+  // localStorage에서 가져온 설교목록 표시
   arr.forEach((it, idx)=>{
-    // 移대뱶 ?뺥깭??而⑦뀒?대꼫
+    // 카드 형태의 컨테이너
     const card = document.createElement('div');
     card.className = 'sermon-card';
     card.style.cssText = 'padding: 16px; margin-bottom: 12px; border: 1px solid var(--border, #ddd); border-radius: 8px; background: var(--panel, #1a1d29);';
 
-    // ?ㅻ뜑 ?곸뿭 (?쒕ぉ, ?좎쭨, 踰꾪듉)
+    // 헤더 영역 (제목, 날짜, 버튼)
     const header = document.createElement('div');
     header.style.cssText = 'display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px;';
 
-    // ?쒕ぉ怨??좎쭨 ?곸뿭
+    // 제목과 날짜 영역
     const titleDateArea = document.createElement('div');
     titleDateArea.style.cssText = 'flex: 1;';
 
     const title = document.createElement('div');
-    title.style.cssText = 'font-weight: 600; font-size: 16px; margin-bottom: 4px; color: #ffd700;'; // 諛앹? ?몃???
-    title.textContent = (it.title || '(?쒕ぉ ?놁쓬)');
+    title.style.cssText = 'font-weight: 600; font-size: 16px; margin-bottom: 4px; color: #ffd700;'; // 밝은 노란색
+    title.textContent = (it.title || '(제목 없음)');
 
     titleDateArea.appendChild(title);
 
-    // 踰꾪듉 ?곸뿭
+    // 버튼 영역
     const buttonArea = document.createElement('div');
     buttonArea.style.cssText = 'display: flex; gap: 8px; align-items: center;';
 
-    // ?ㅺ탳??젣 踰꾪듉
+    // 설교삭제 버튼
     const btnDelete = document.createElement('button');
-    btnDelete.textContent = '??젣';
+    btnDelete.textContent = '삭제';
     btnDelete.className = 'sermon-delete-btn';
     btnDelete.style.cssText = 'padding: 6px 16px; font-size: 13px; white-space: nowrap; border: 1px solid var(--danger, #ff6b6b); color: var(--danger, #ff6b6b); background: transparent; border-radius: 4px; cursor: pointer;';
     btnDelete.addEventListener('click', (e)=>{
       e.stopPropagation();
-      if(!confirm(`"${it.title || '(?쒕ぉ ?놁쓬)'}" ?ㅺ탳瑜???젣?좉퉴??`)) return;
+      if(!confirm(`"${it.title || '(제목 없음)'}" 설교를 삭제할까요?`)) return;
       const m = getSermonMap();
       const a = m[CURRENT.paraId] || [];
       a.splice(idx, 1);
       m[CURRENT.paraId] = a;
       setSermonMap(m);
       renderSermonList();
-      status('?ㅺ탳媛 ??젣?섏뿀?듬땲??');
+      status('설교가 삭제되었습니다.');
     });
 
-    // ?ㅺ탳蹂닿린 踰꾪듉
+    // 설교보기 버튼
     const btnView = document.createElement('button');
-    btnView.textContent = '?ㅺ탳蹂닿린';
+    btnView.textContent = '설교보기';
     btnView.className = 'sermon-view-btn';
     
-    // ?ㅺ탳 ?댁슜??梨꾩썙???덈뒗吏 ?뺤씤
+    // 설교 내용이 채워져 있는지 확인
     const hasContent = (it.body && it.body.trim().replace(/<[^>]*>/g, '').trim()) || 
-                      (it.title && it.title.trim() && it.title !== '(?쒕ぉ ?놁쓬)');
+                      (it.title && it.title.trim() && it.title !== '(제목 없음)');
     
-    // ?댁슜???덉쑝硫?filled ?ㅽ????곸슜
+    // 내용이 있으면 filled 스타일 적용
     if (hasContent) {
       btnView.classList.add('filled');
       btnView.style.cssText = 'padding: 6px 16px; font-size: 13px; white-space: nowrap; background: #ff8c00; border-color: #ffa94d; color: #fff; border-width: 1px; box-shadow: 0 0 6px rgba(0,0,0,0.25);';
@@ -3115,33 +2942,33 @@ function renderSermonList(){
     header.appendChild(titleDateArea);
     header.appendChild(buttonArea);
 
-    // 硫뷀? ?뺣낫 ?곸뿭 (蹂몃Ц, 珥덉젏, ?ㅼ썙?? ?곸슜???
+    // 메타 정보 영역 (본문, 초점, 키워드, 적용대상)
     const metaArea = document.createElement('div');
     metaArea.style.cssText = 'margin-bottom: 12px; padding: 10px; background: var(--bg, #0f1115); border-radius: 4px; border: 1px solid var(--border, #252a36); font-size: 13px;';
     
     const metaItems = [];
     
-    // 蹂몃Ц ?댁슜 (HTML???덉쑝硫??쒖떆)
+    // 본문 내용 (HTML이 있으면 표시)
     if (it.body && it.body.trim()) {
-      // ?깃꼍?꾩튂?뺣낫 ?앹꽦
+      // 성경위치정보 생성
       let locationText = '';
       if (CURRENT.paraId) {
         const [book, chap, ref] = CURRENT.paraId.split('|');
         if (book && chap) {
-          locationText = `${book} ${chap}??${ref || ''}`;
+          locationText = `${book} ${chap}장 ${ref || ''}`;
         }
       }
       
       const bodyItem = document.createElement('div');
       bodyItem.style.cssText = 'margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border, #252a36);';
-      bodyItem.innerHTML = `<span style="font-weight: 600; color: var(--text-muted, #9aa0ab);">蹂몃Ц:</span> <span style="color: var(--muted, #9aa0ab); margin-left: 4px;">${escapeHtml(locationText)}</span>`;
+      bodyItem.innerHTML = `<span style="font-weight: 600; color: var(--text-muted, #9aa0ab);">본문:</span> <span style="color: var(--muted, #9aa0ab); margin-left: 4px;">${escapeHtml(locationText)}</span>`;
       metaItems.push(bodyItem);
     }
     
     if (it.focus && it.focus.trim()) {
       const focusItem = document.createElement('div');
       focusItem.style.cssText = 'margin-bottom: 6px;';
-      focusItem.innerHTML = `<span style="font-weight: 600; color: var(--text-muted, #9aa0ab);">珥덉젏:</span> <span style="color: var(--text, #e6e8ef);">${escapeHtml(it.focus)}</span>`;
+      focusItem.innerHTML = `<span style="font-weight: 600; color: var(--text-muted, #9aa0ab);">초점:</span> <span style="color: var(--text, #e6e8ef);">${escapeHtml(it.focus)}</span>`;
       metaItems.push(focusItem);
     }
     
@@ -3149,14 +2976,14 @@ function renderSermonList(){
       const keywordsItem = document.createElement('div');
       keywordsItem.style.cssText = 'margin-bottom: 6px;';
       const keywordsList = it.keywords.split(',').map(k => k.trim()).filter(k => k).join(', ');
-      keywordsItem.innerHTML = `<span style="font-weight: 600; color: var(--text-muted, #9aa0ab);">?ㅼ썙??</span> <span style="color: var(--text, #e6e8ef);">${escapeHtml(keywordsList)}</span>`;
+      keywordsItem.innerHTML = `<span style="font-weight: 600; color: var(--text-muted, #9aa0ab);">키워드:</span> <span style="color: var(--text, #e6e8ef);">${escapeHtml(keywordsList)}</span>`;
       metaItems.push(keywordsItem);
     }
     
     if (it.target && it.target.trim()) {
       const targetItem = document.createElement('div');
       targetItem.style.cssText = 'margin-bottom: 0;';
-      targetItem.innerHTML = `<span style="font-weight: 600; color: var(--text-muted, #9aa0ab);">?곸슜???</span> <span style="color: var(--text, #e6e8ef);">${escapeHtml(it.target)}</span>`;
+      targetItem.innerHTML = `<span style="font-weight: 600; color: var(--text-muted, #9aa0ab);">적용대상:</span> <span style="color: var(--text, #e6e8ef);">${escapeHtml(it.target)}</span>`;
       metaItems.push(targetItem);
     }
     
@@ -3164,7 +2991,7 @@ function renderSermonList(){
       metaItems.forEach(item => metaArea.appendChild(item));
     }
 
-    // 留곹겕 ?곸뿭
+    // 링크 영역
     const linkArea = document.createElement('div');
     if (it.link && it.link.trim()) {
       linkArea.style.cssText = 'margin-bottom: 8px;';
@@ -3178,7 +3005,7 @@ function renderSermonList(){
       linkArea.appendChild(linkEl);
     }
 
-    // ?대?吏 ?곸뿭
+    // 이미지 영역
     const imageArea = document.createElement('div');
     if (it.images && it.images.length > 0) {
       imageArea.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;';
@@ -3189,10 +3016,10 @@ function renderSermonList(){
         const imgEl = document.createElement('img');
         imgEl.src = img.url || img;
         imgEl.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
-        imgEl.alt = img.alt || `?대?吏 ${imgIdx + 1}`;
+        imgEl.alt = img.alt || `이미지 ${imgIdx + 1}`;
         imgEl.onerror = () => {
           imgEl.style.display = 'none';
-          imgContainer.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999;">?대?吏 ?놁쓬</div>';
+          imgContainer.innerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#999;">이미지 없음</div>';
         };
         
         imgContainer.appendChild(imgEl);
@@ -3200,7 +3027,7 @@ function renderSermonList(){
       });
     }
 
-    // 紐⑤뱺 ?붿냼瑜?移대뱶??異붽?
+    // 모든 요소를 카드에 추가
     card.appendChild(header);
     if (metaArea.hasChildNodes()) card.appendChild(metaArea);
     if (linkArea.hasChildNodes()) card.appendChild(linkArea);
@@ -3210,62 +3037,62 @@ function renderSermonList(){
   });
 }
 
-/* ???ㅺ탳紐⑸줉 ???踰꾪듉 */
+/* ✅ 설교목록 저장 버튼 */
 el('saveSermonListBtn').onclick = () => {
-  // CURRENT.paraId ?뺤씤 諛??ㅼ젙
+  // CURRENT.paraId 확인 및 설정
   if (!CURRENT.paraId) {
     if (!syncCurrentFromOpen()) {
-      alert('?⑤씫??癒쇱? ?좏깮??二쇱꽭??');
+      alert('단락을 먼저 선택해 주세요.');
       return;
     }
     const para = BIBLE?.books?.[CURRENT.book]?.[CURRENT.chap]?.paras?.[CURRENT.paraIdx];
     if (!para) {
-      alert('?⑤씫??李얠쓣 ???놁뒿?덈떎.');
+      alert('단락을 찾을 수 없습니다.');
       return;
     }
     CURRENT.paraId = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
   }
   
-  // ?꾩옱 ?ㅺ탳 紐⑸줉 媛?몄삤湲?(?꾩옱 蹂댁씠怨??덈뒗 ?ㅺ탳紐⑸줉)
+  // 현재 설교 목록 가져오기 (현재 보이고 있는 설교목록)
   const map = getSermonMap();
   const arr = map[CURRENT.paraId] || [];
   
   if (arr.length === 0) {
-    alert('??ν븷 ?ㅺ탳媛 ?놁뒿?덈떎.');
+    alert('저장할 설교가 없습니다.');
     return;
   }
   
-  // ??????붾쾭源?
-  console.log('[saveSermonListBtn] ?????- paraId:', CURRENT.paraId, '?ㅺ탳 媛쒖닔:', arr.length);
+  // 저장 전 디버깅
+  console.log('[saveSermonListBtn] 저장 전 - paraId:', CURRENT.paraId, '설교 개수:', arr.length);
   
-  // ????쒕룄
-  const saved = setSermonMap(map, true); // 利됱떆 ???
+  // 저장 시도
+  const saved = setSermonMap(map, true); // 즉시 저장
   
   if (!saved) {
-    console.error('[saveSermonListBtn] ?ㅺ탳 ????ㅽ뙣');
-    alert('?ㅺ탳 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??');
+    console.error('[saveSermonListBtn] 설교 저장 실패');
+    alert('설교 저장에 실패했습니다. 다시 시도해 주세요.');
     return;
   }
   
-  // ?????寃利? localStorage?먯꽌 ?ㅼ젣濡???λ릺?덈뒗吏 ?뺤씤
+  // 저장 후 검증: localStorage에서 실제로 저장되었는지 확인
   const verifyMap = getSermonMap();
   const verifyArr = verifyMap[CURRENT.paraId] || [];
-  console.log('[saveSermonListBtn] ?????寃利?- paraId:', CURRENT.paraId, '??λ맂 ?ㅺ탳 媛쒖닔:', verifyArr.length);
+  console.log('[saveSermonListBtn] 저장 후 검증 - paraId:', CURRENT.paraId, '저장된 설교 개수:', verifyArr.length);
   
   if (verifyArr.length === 0) {
-    console.error('[saveSermonListBtn] ???寃利??ㅽ뙣: ?ㅺ탳媛 ??λ릺吏 ?딆븯?듬땲??');
-    alert('?ㅺ탳 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??');
+    console.error('[saveSermonListBtn] 저장 검증 실패: 설교가 저장되지 않았습니다.');
+    alert('설교 저장에 실패했습니다. 다시 시도해 주세요.');
     return;
   }
   
-  // ????깃났
-  status(`${arr.length}媛쒖쓽 ?ㅺ탳媛 ??λ릺?덉뒿?덈떎.`);
+  // 저장 성공
+  status(`${arr.length}개의 설교가 저장되었습니다.`);
   
-  // ????깃났 ?쒓컖???쇰뱶諛?
+  // 저장 성공 시각적 피드백
   const btn = el('saveSermonListBtn');
   if (btn) {
     const originalText = btn.textContent;
-    btn.textContent = '??λ맖 ??;
+    btn.textContent = '저장됨 ✓';
     btn.style.opacity = '0.7';
     setTimeout(() => {
       btn.textContent = originalText;
@@ -3274,118 +3101,118 @@ el('saveSermonListBtn').onclick = () => {
   }
 };
 
-/* ?????ㅺ탳紐⑸줉 踰꾪듉 - ?ㅺ탳 ?뺣낫 ?낅젰 */
+/* ✅ 새 설교목록 버튼 - 설교 정보 입력 */
 function bindNewSermonBtn() {
   const newSermonBtn = el('newSermonBtn');
   if (!newSermonBtn) return;
   
-  // 湲곗〈 ?대깽??由ъ뒪???쒓굅 ???덈줈 異붽? (以묐났 諛⑹?)
+  // 기존 이벤트 리스너 제거 후 새로 추가 (중복 방지)
   const newBtn = newSermonBtn.cloneNode(true);
   newSermonBtn.parentNode?.replaceChild(newBtn, newSermonBtn);
   
   newBtn.onclick = ()=>{
     if (!CURRENT.paraId) {
       if (!syncCurrentFromOpen()) { 
-        alert('?⑤씫??癒쇱? ?좏깮?섏꽭??'); 
+        alert('단락을 먼저 선택하세요.'); 
         return; 
       }
       const para = BIBLE.books[CURRENT.book][CURRENT.chap].paras[CURRENT.paraIdx];
       if (!para) {
-        alert('?⑤씫??李얠쓣 ???놁뒿?덈떎.');
+        alert('단락을 찾을 수 없습니다.');
         return;
       }
       CURRENT.paraId = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
     }
     
-    // ?ㅺ탳 ?뺣낫 ?낅젰 紐⑤떖 ?닿린
+    // 설교 정보 입력 모달 열기
     openSermonInputModal();
   };
 }
 
-// 珥덇린 諛붿씤??(DOM??以鍮꾨맂 ??
+// 초기 바인딩 (DOM이 준비된 후)
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bindNewSermonBtn);
 } else {
   bindNewSermonBtn();
 }
 
-/* ???ㅺ탳 ?뺣낫 ?낅젰 紐⑤떖 - ?띿뒪???뚯떛 諛⑹떇 */
+/* ✅ 설교 정보 입력 모달 - 텍스트 파싱 방식 */
 function openSermonInputModal(){
-  // CURRENT.paraId ?뺤씤 諛??ㅼ젙
+  // CURRENT.paraId 확인 및 설정
   if (!CURRENT.paraId) {
     if (!syncCurrentFromOpen()) {
-      alert('?⑤씫??癒쇱? ?좏깮??二쇱꽭??');
+      alert('단락을 먼저 선택해 주세요.');
       return;
     }
     const para = BIBLE?.books?.[CURRENT.book]?.[CURRENT.chap]?.paras?.[CURRENT.paraIdx];
     if (!para) {
-      alert('?⑤씫??李얠쓣 ???놁뒿?덈떎.');
+      alert('단락을 찾을 수 없습니다.');
       return;
     }
     CURRENT.paraId = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
   }
   
-  // 湲곗〈 紐⑤떖 ?댁슜 ?④린湲?
+  // 기존 모달 내용 숨기기
   sermonList.innerHTML = '';
   sermonEditor.style.display = 'none';
   
-  // ?낅젰 ?곸뿭 ?앹꽦
+  // 입력 영역 생성
   const inputArea = document.createElement('div');
   inputArea.style.cssText = 'padding: 20px;';
   inputArea.innerHTML = `
     <div style="margin-bottom: 12px;">
-      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text, #e6e8ef);">?ㅺ탳 ?뺣낫 ?낅젰</label>
+      <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text, #e6e8ef);">설교 정보 입력</label>
       <div style="font-size: 12px; color: var(--text-muted, #9aa0ab); margin-bottom: 8px; padding: 8px; background: var(--bg, #0f1115); border-radius: 4px; line-height: 1.6;">
-        ?뺤떇: 踰덊샇? "?ㅺ탳 ?쒕ぉ:" ?먮뒗 踰덊샇留뚯쑝濡??쒖옉, 洹??ㅼ쓬 "蹂몃Ц:", "珥덉젏:", "?ㅼ썙??", "?곸슜 ???" ?쇰꺼濡??뺣낫 ?낅젰<br/>
-        ?щ윭 ?ㅺ탳瑜???踰덉뿉 ?낅젰 媛?ν빀?덈떎.<br/>
-        ??<br/>
-        1. ?ㅺ탳 ?쒕ぉ: "?쒖큹???섎굹?섏씠" ???좎븰??泥?臾몄옣<br/>
-        蹂몃Ц: 李?1:1??<br/>
-        珥덉젏: "?쒖큹??踰좊젅?ы듃)"? "?섎굹???섎줈??"?쇰줈 ?쒖옉?섎뒗 ?좎븰??諛⑺뼢 ?꾪솚<br/>
-        ?ㅼ썙?? ?섎굹??以묒떖 ?멸퀎愿, ?몄깮???쒖옉???ъ젙由?br/>
-        ?곸슜 ??? ??援먯씤, ?좎븰 湲곗큹 ?ъ젙鍮???
+        형식: 번호와 "설교 제목:" 또는 번호만으로 시작, 그 다음 "본문:", "초점:", "키워드:", "적용 대상:" 라벨로 정보 입력<br/>
+        여러 설교를 한 번에 입력 가능합니다.<br/>
+        예:<br/>
+        1. 설교 제목: "태초에 하나님이" – 신앙의 첫 문장<br/>
+        본문: 창 1:1–5<br/>
+        초점: "태초에(베레쉬트)"와 "하나님(엘로힘)"으로 시작하는 신앙의 방향 전환<br/>
+        키워드: 하나님 중심 세계관, 인생의 시작점 재정립<br/>
+        적용 대상: 전 교인, 신앙 기초 재정비 시
       </div>
       <textarea id="newSermonText" 
-        placeholder="?ㅺ탳 ?뺣낫瑜??낅젰?섏꽭??(?щ윭 ?ㅺ탳瑜???踰덉뿉 ?낅젰 媛??&#10;&#10;??&#10;1. ?ㅺ탳 ?쒕ぉ: &quot;?쒖큹???섎굹?섏씠&quot; ???좎븰??泥?臾몄옣&#10;蹂몃Ц: 李?1:1??&#10;珥덉젏: ?쒖큹?먯? ?섎굹?섏쑝濡??쒖옉?섎뒗 ?좎븰??諛⑺뼢 ?꾪솚&#10;?ㅼ썙?? ?섎굹??以묒떖 ?멸퀎愿, ?몄깮???쒖옉???ъ젙由?#10;?곸슜 ??? ??援먯씤"
+        placeholder="설교 정보를 입력하세요 (여러 설교를 한 번에 입력 가능)&#10;&#10;예:&#10;1. 설교 제목: &quot;태초에 하나님이&quot; – 신앙의 첫 문장&#10;본문: 창 1:1–5&#10;초점: 태초에와 하나님으로 시작하는 신앙의 방향 전환&#10;키워드: 하나님 중심 세계관, 인생의 시작점 재정립&#10;적용 대상: 전 교인"
         style="width: 100%; min-height: 300px; padding: 12px; border: 1px solid var(--border, #252a36); border-radius: 4px; background: var(--bg, #0f1115); color: var(--text, #e6e8ef); font-size: 14px; resize: vertical; font-family: inherit; line-height: 1.6;"></textarea>
     </div>
     <div style="display: flex; gap: 8px; justify-content: flex-end;">
-      <button id="cancelSermonInput" style="padding: 8px 16px; border: 1px solid var(--border, #252a36); border-radius: 4px; background: var(--bg, #0f1115); color: var(--text, #e6e8ef); cursor: pointer;">痍⑥냼</button>
-      <button id="saveSermonInput" class="primary" style="padding: 8px 16px; border-radius: 4px; cursor: pointer;">???/button>
+      <button id="cancelSermonInput" style="padding: 8px 16px; border: 1px solid var(--border, #252a36); border-radius: 4px; background: var(--bg, #0f1115); color: var(--text, #e6e8ef); cursor: pointer;">취소</button>
+      <button id="saveSermonInput" class="primary" style="padding: 8px 16px; border-radius: 4px; cursor: pointer;">저장</button>
     </div>
   `;
   
   sermonList.appendChild(inputArea);
   
-  // 痍⑥냼 踰꾪듉
+  // 취소 버튼
   document.getElementById('cancelSermonInput').onclick = () => {
     renderSermonList();
   };
   
-  // ???踰꾪듉
+  // 저장 버튼
   document.getElementById('saveSermonInput').onclick = () => {
     const text = (document.getElementById('newSermonText').value || '').trim();
     
     if (!text) {
-      alert('?ㅺ탳 ?뺣낫瑜??낅젰?댁＜?몄슂.');
+      alert('설교 정보를 입력해주세요.');
       return;
     }
     
-    // ?띿뒪???뚯떛 (?щ윭 ?ㅺ탳 吏??
+    // 텍스트 파싱 (여러 설교 지원)
     const sermons = parseSermonText(text);
     
     if (sermons.length === 0) {
-      alert('?ㅺ탳 ?뺣낫瑜??щ컮瑜닿쾶 ?낅젰?댁＜?몄슂.');
+      alert('설교 정보를 올바르게 입력해주세요.');
       return;
     }
     
-    // ?ㅺ탳 ?앹꽦
+    // 설교 생성
     const map = getSermonMap();
     const arr = map[CURRENT.paraId] || [];
     const now = new Date();
     const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     
-    // ?뚯떛??紐⑤뱺 ?ㅺ탳 異붽?
+    // 파싱된 모든 설교 추가
     sermons.forEach(sermon => {
       if (sermon.title) {
         const newId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random() + Math.random());
@@ -3405,43 +3232,43 @@ function openSermonInputModal(){
     
     map[CURRENT.paraId] = arr;
     
-    // ??????붾쾭源?
-    console.log('[saveSermonInput] ?????- paraId:', CURRENT.paraId, '?ㅺ탳 媛쒖닔:', arr.length);
+    // 저장 전 디버깅
+    console.log('[saveSermonInput] 저장 전 - paraId:', CURRENT.paraId, '설교 개수:', arr.length);
     
-    const saved = setSermonMap(map, true); // 利됱떆 ???
+    const saved = setSermonMap(map, true); // 즉시 저장
     
-    // ????뺤씤
+    // 저장 확인
     if (!saved) {
-      console.error('[saveSermonInput] ?ㅺ탳 ????ㅽ뙣');
-      alert('?ㅺ탳 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??');
+      console.error('[saveSermonInput] 설교 저장 실패');
+      alert('설교 저장에 실패했습니다. 다시 시도해 주세요.');
       return;
     }
     
-    // ?????寃利? localStorage?먯꽌 ?ㅼ젣濡???λ릺?덈뒗吏 ?뺤씤
+    // 저장 후 검증: localStorage에서 실제로 저장되었는지 확인
     const verifyMap = getSermonMap();
     const verifyArr = verifyMap[CURRENT.paraId] || [];
-    console.log('[saveSermonInput] ?????寃利?- paraId:', CURRENT.paraId, '??λ맂 ?ㅺ탳 媛쒖닔:', verifyArr.length);
+    console.log('[saveSermonInput] 저장 후 검증 - paraId:', CURRENT.paraId, '저장된 설교 개수:', verifyArr.length);
     
     if (verifyArr.length === 0) {
-      console.error('[saveSermonInput] ???寃利??ㅽ뙣: ?ㅺ탳媛 ??λ릺吏 ?딆븯?듬땲??');
-      alert('?ㅺ탳 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??');
+      console.error('[saveSermonInput] 저장 검증 실패: 설교가 저장되지 않았습니다.');
+      alert('설교 저장에 실패했습니다. 다시 시도해 주세요.');
       return;
     }
     
-    // ?낅젰 ?곸뿭 ?쒓굅 ???ㅺ탳紐⑸줉 ?뚮뜑留?
+    // 입력 영역 제거 후 설교목록 렌더링
     sermonList.innerHTML = '';
     renderSermonList();
-    status(`${sermons.length}媛쒖쓽 ?ㅺ탳媛 ??λ릺?덉뒿?덈떎.`);
+    status(`${sermons.length}개의 설교가 저장되었습니다.`);
   };
   
-  // ?ъ빱??
+  // 포커스
   setTimeout(() => {
     const textInput = document.getElementById('newSermonText');
     if (textInput) textInput.focus();
   }, 0);
 }
 
-/* ???띿뒪?몄뿉???ㅺ탳 ?뺣낫 ?뚯떛 (?щ윭 ?ㅺ탳 吏?? */
+/* ✅ 텍스트에서 설교 정보 파싱 (여러 설교 지원) */
 function parseSermonText(text) {
   const lines = text.split('\n').map(line => line.trim());
   const sermons = [];
@@ -3453,14 +3280,14 @@ function parseSermonText(text) {
     const line = lines[i];
     if (!line) continue;
     
-    // ???ㅺ탳 ?쒖옉 (踰덊샇濡??쒖옉)
+    // 새 설교 시작 (번호로 시작)
     if (line.match(/^\d+[\.\)]/)) {
-      // ?댁쟾 ?ㅺ탳 ???
+      // 이전 설교 저장
       if (currentSermon && currentSermon.title) {
         sermons.push(currentSermon);
       }
       
-      // ???ㅺ탳 ?쒖옉
+      // 새 설교 시작
       currentSermon = {
         title: '',
         body: '',
@@ -3470,30 +3297,30 @@ function parseSermonText(text) {
       };
       currentSection = null;
       
-      // "?ㅺ탳 ?쒕ぉ:"???덈뒗 寃쎌슦
-      if (line.match(/?ㅺ탳\s*?쒕ぉ\s*[:竊?/i)) {
-        let titleText = line.replace(/^\d+[\.\)]\s*?ㅺ탳\s*?쒕ぉ\s*[:竊?/i, '').trim();
-        // ?곗샂???쒓굅
+      // "설교 제목:"이 있는 경우
+      if (line.match(/설교\s*제목\s*[:：]/i)) {
+        let titleText = line.replace(/^\d+[\.\)]\s*설교\s*제목\s*[:：]/i, '').trim();
+        // 따옴표 제거
         titleText = titleText.replace(/^["'"]|["'"]$/g, '');
         currentSermon.title = titleText;
       } else {
-        // 踰덊샇留??덇퀬 "?ㅺ탳 ?쒕ぉ:"???녿뒗 寃쎌슦, 踰덊샇 ?쒓굅?섍퀬 ?섎㉧吏瑜??쒕ぉ?쇰줈
+        // 번호만 있고 "설교 제목:"이 없는 경우, 번호 제거하고 나머지를 제목으로
         let titleText = line.replace(/^\d+[\.\)]\s*/, '').trim();
-        // ?곗샂???쒓굅
+        // 따옴표 제거
         titleText = titleText.replace(/^["'"]|["'"]$/g, '');
         currentSermon.title = titleText;
       }
       continue;
     }
     
-    // "?ㅺ탳 ?쒕ぉ:"?쇰줈 ?쒖옉?섎뒗 寃쎌슦 (踰덊샇 ?놁씠)
-    if (line.match(/^?ㅺ탳\s*?쒕ぉ\s*[:竊?/i)) {
-      // ?댁쟾 ?ㅺ탳 ???
+    // "설교 제목:"으로 시작하는 경우 (번호 없이)
+    if (line.match(/^설교\s*제목\s*[:：]/i)) {
+      // 이전 설교 저장
       if (currentSermon && currentSermon.title) {
         sermons.push(currentSermon);
       }
       
-      // ???ㅺ탳 ?쒖옉
+      // 새 설교 시작
       currentSermon = {
         title: '',
         body: '',
@@ -3503,50 +3330,50 @@ function parseSermonText(text) {
       };
       currentSection = null;
       
-      let titleText = line.replace(/^?ㅺ탳\s*?쒕ぉ\s*[:竊?/i, '').trim();
-      // ?곗샂???쒓굅
+      let titleText = line.replace(/^설교\s*제목\s*[:：]/i, '').trim();
+      // 따옴표 제거
       titleText = titleText.replace(/^["'"]|["'"]$/g, '');
       currentSermon.title = titleText;
       continue;
     }
     
-    // currentSermon???놁쑝硫?嫄대꼫?곌린
+    // currentSermon이 없으면 건너뛰기
     if (!currentSermon) continue;
     
-    // 蹂몃Ц ?쇰꺼 泥댄겕
-    if (line.match(/^蹂몃Ц\s*[:竊?/i) || line.match(/^body\s*[:竊?/i)) {
+    // 본문 라벨 체크
+    if (line.match(/^본문\s*[:：]/i) || line.match(/^body\s*[:：]/i)) {
       currentSection = 'body';
-      currentSermon.body = line.replace(/^蹂몃Ц\s*[:竊?|^body\s*[:竊?/i, '').trim();
+      currentSermon.body = line.replace(/^본문\s*[:：]|^body\s*[:：]/i, '').trim();
       continue;
     }
     
-    // 珥덉젏 ?쇰꺼 泥댄겕
-    if (line.match(/^珥덉젏\s*[:竊?/i) || line.match(/^focus\s*[:竊?/i)) {
+    // 초점 라벨 체크
+    if (line.match(/^초점\s*[:：]/i) || line.match(/^focus\s*[:：]/i)) {
       currentSection = 'focus';
-      currentSermon.focus = line.replace(/^珥덉젏\s*[:竊?|^focus\s*[:竊?/i, '').trim();
+      currentSermon.focus = line.replace(/^초점\s*[:：]|^focus\s*[:：]/i, '').trim();
       continue;
     }
     
-    // ?ㅼ썙???쇰꺼 泥댄겕
-    if (line.match(/^?ㅼ썙??s*[:竊?/i) || line.match(/^keywords?\s*[:竊?/i)) {
+    // 키워드 라벨 체크
+    if (line.match(/^키워드\s*[:：]/i) || line.match(/^keywords?\s*[:：]/i)) {
       currentSection = 'keywords';
-      currentSermon.keywords = line.replace(/^?ㅼ썙??s*[:竊?|^keywords?\s*[:竊?/i, '').trim();
+      currentSermon.keywords = line.replace(/^키워드\s*[:：]|^keywords?\s*[:：]/i, '').trim();
       continue;
     }
     
-    // ?곸슜 ????쇰꺼 泥댄겕
-    if (line.match(/^?곸슜\s*???s*[:竊?/i) || line.match(/^?곸슜???s*[:竊?/i) || line.match(/^target\s*[:竊?/i)) {
+    // 적용 대상 라벨 체크
+    if (line.match(/^적용\s*대상\s*[:：]/i) || line.match(/^적용대상\s*[:：]/i) || line.match(/^target\s*[:：]/i)) {
       currentSection = 'target';
-      currentSermon.target = line.replace(/^?곸슜\s*???s*[:竊?|^?곸슜???s*[:竊?|^target\s*[:竊?/i, '').trim();
+      currentSermon.target = line.replace(/^적용\s*대상\s*[:：]|^적용대상\s*[:：]|^target\s*[:：]/i, '').trim();
       continue;
     }
     
-    // 濡쒕쭏 ?レ옄 ?뱀뀡 (?? 媛숈? 寃?? 臾댁떆
-    if (line.match(/^[?졻뀫?™뀭?ㅲ뀯?╈뀱?ⓥ뀳]+[\.\)]/)) {
+    // 로마 숫자 섹션 (Ⅱ. 같은 것)은 무시
+    if (line.match(/^[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+[\.\)]/)) {
       continue;
     }
     
-    // ?꾩옱 ?뱀뀡???곕씪 ?댁슜 異붽?
+    // 현재 섹션에 따라 내용 추가
     if (currentSection === 'body') {
       currentSermon.body += (currentSermon.body ? '\n' : '') + line;
     } else if (currentSection === 'focus') {
@@ -3556,15 +3383,15 @@ function parseSermonText(text) {
     } else if (currentSection === 'target') {
       currentSermon.target += (currentSermon.target ? ' ' : '') + line;
     } else if (!currentSermon.title) {
-      // ?뱀뀡???뺥빐吏吏 ?딆븯怨??쒕ぉ???놁쑝硫??쒕ぉ?쇰줈
+      // 섹션이 정해지지 않았고 제목도 없으면 제목으로
       currentSermon.title = line;
     } else {
-      // ?뱀뀡???뺥빐吏吏 ?딆븯?쇰㈃ 蹂몃Ц?쇰줈
+      // 섹션이 정해지지 않았으면 본문으로
       currentSermon.body += (currentSermon.body ? '\n' : '') + line;
     }
   }
   
-  // 留덉?留??ㅺ탳 ???
+  // 마지막 설교 저장
   if (currentSermon && currentSermon.title) {
     sermons.push(currentSermon);
   }
@@ -3576,14 +3403,14 @@ el('cancelEdit')?.addEventListener('click', ()=>{
   if(sermonEditor.dataset.ctxType){
     sermonEditor.dataset.ctxType = '';
     modalWrap.style.display = 'none'; 
-    // 紐⑤떖???ㅼ젣濡??ロ엺 ?꾩뿉留?aria-hidden??true濡??ㅼ젙
+    // 모달이 실제로 닫힌 후에만 aria-hidden을 true로 설정
     requestAnimationFrame(() => {
       if (modalWrap.style.display === 'none') {
         modalWrap.setAttribute('aria-hidden','true');
       }
     });
   }else{
-    // ?ㅺ탳 ?몄쭛湲곗씤 寃쎌슦 ?ㅺ탳紐⑸줉?쇰줈 ?뚯븘媛湲?
+    // 설교 편집기인 경우 설교목록으로 돌아가기
     sermonEditor.style.display = 'none';
     renderSermonList();
   }
@@ -3591,23 +3418,23 @@ el('cancelEdit')?.addEventListener('click', ()=>{
 });
 
 el('saveSermon').onclick = () => {
-  const title = (sermonTitle.value || '').trim() || '(?쒕ぉ ?놁쓬)';
+  const title = (sermonTitle.value || '').trim() || '(제목 없음)';
   let body = getBodyHTML() || '';
   body = body.replace(/^\s+|\s+$/g, '');
 
-  // 硫뷀? ?꾨뱶 媛?媛?몄삤湲?(?꾨뱶媛 ?④꺼???덉쑝硫?湲곗〈 媛??좎?)
+  // 메타 필드 값 가져오기 (필드가 숨겨져 있으면 기존 값 유지)
   const focusEl = document.getElementById('sermonFocus');
   const keywordsEl = document.getElementById('sermonKeywords');
   const targetEl = document.getElementById('sermonTarget');
   
-  // ?몄쭛 紐⑤뱶?몄? ?뺤씤
+  // 편집 모드인지 확인
   const editing = sermonEditor.dataset.editing;
   let focus = '';
   let keywords = '';
   let target = '';
   
   if (editing !== '' && CURRENT.paraId) {
-    // ?몄쭛 紐⑤뱶: 湲곗〈 媛??좎?
+    // 편집 모드: 기존 값 유지
     const map = getSermonMap();
     const arr = map[CURRENT.paraId] || [];
     const i = +editing;
@@ -3619,7 +3446,7 @@ el('saveSermon').onclick = () => {
     }
   }
   
-  // 硫뷀? ?꾨뱶媛 ?쒖떆?섏뼱 ?덉쑝硫??낅젰??媛??ъ슜
+  // 메타 필드가 표시되어 있으면 입력된 값 사용
   if (focusEl && focusEl.offsetParent !== null) {
     focus = (focusEl.value || '').trim();
   }
@@ -3637,17 +3464,17 @@ el('saveSermon').onclick = () => {
   const ctxType = sermonEditor.dataset.ctxType || '';
 
   // ===============================
-  // 1) 梨??⑥쐞 ?먮뵒??(湲곕낯?댄빐 / ?댁슜援ъ“ / 硫붿꽭吏?붿빟)
+  // 1) 책 단위 에디터 (기본이해 / 내용구조 / 메세지요약)
   //    ctxType: book-basic / book-struct / book-summary
   // ===============================
   if (ctxType && ctxType.startsWith('book-')) {
     const bookName = sermonEditor.dataset.bookName;
     if (!bookName) {
-      alert('梨??뺣낫瑜?李얠쓣 ???놁뒿?덈떎.(bookName ?꾨씫)');
+      alert('책 정보를 찾을 수 없습니다.(bookName 누락)');
       return;
     }
 
-    // ?대뼡 ??μ냼???ｌ쓣吏 寃곗젙
+    // 어떤 저장소에 넣을지 결정
     const storeKey =
       ctxType === 'book-basic'  ? STORAGE_BOOK_BASIC  :
       ctxType === 'book-struct' ? STORAGE_BOOK_STRUCT :
@@ -3657,25 +3484,25 @@ el('saveSermon').onclick = () => {
     map[bookName] = { title, body, images: imgs, date };
     setDocMap(storeKey, map);
 
-    // 梨??⑥쐞???몄쭛湲곕? ?レ? ?딄퀬 ?좎?
-    status(`??λ맖(梨?${bookName} 쨌 ${title})`);
+    // 책 단위는 편집기를 닫지 않고 유지
+    status(`저장됨(책 ${bookName} · ${title})`);
     return;
   }
 
   // ===============================
-  // 2) ?⑤씫 而⑦뀓?ㅽ듃 ?먮뵒??(?⑥쐞?깃꼍??留λ씫 / ?꾩껜?깃꼍??留λ씫 / 二쇱꽍 / ?댁슜?붿빟)
+  // 2) 단락 컨텍스트 에디터 (단위성경속 맥락 / 전체성경속 맥락 / 주석 / 내용요약)
   //    ctxType: unit / whole / commentary / summary
   // ===============================
   if (ctxType) {
     if (!BIBLE || !CURRENT || CURRENT.book == null ||
         !Number.isFinite(CURRENT.chap) || !Number.isFinite(CURRENT.paraIdx)) {
-      alert('?⑤씫 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎. 癒쇱? ?⑤씫???좏깮??二쇱꽭??');
+      alert('단락 정보를 찾을 수 없습니다. 먼저 단락을 선택해 주세요.');
       return;
     }
 
     const para = BIBLE.books[CURRENT.book][CURRENT.chap].paras[CURRENT.paraIdx];
     if (!para) {
-      alert('?좏깮???⑤씫??李얠쓣 ???놁뒿?덈떎.');
+      alert('선택한 단락을 찾을 수 없습니다.');
       return;
     }
 
@@ -3685,7 +3512,7 @@ el('saveSermon').onclick = () => {
       ctxType === 'unit'       ? STORAGE_UNIT_CTX :
       ctxType === 'whole'      ? STORAGE_WHOLE_CTX :
       ctxType === 'commentary' ? STORAGE_COMMENTARY :
-                                 STORAGE_SUMMARY; // ?⑤씫 ?댁슜?붿빟
+                                 STORAGE_SUMMARY; // 단락 내용요약
 
     const map = getDocMap(key);
     map[pid] = { title, body, images: imgs, date };
@@ -3694,22 +3521,22 @@ el('saveSermon').onclick = () => {
     sermonEditor.dataset.ctxType = '';
     sermonEditor.classList.remove('context-editor');
     modalWrap.style.display = 'none';
-    // 紐⑤떖???ㅼ젣濡??ロ엺 ?꾩뿉留?aria-hidden??true濡??ㅼ젙
+    // 모달이 실제로 닫힌 후에만 aria-hidden을 true로 설정
     requestAnimationFrame(() => {
       if (modalWrap.style.display === 'none') {
         modalWrap.setAttribute('aria-hidden', 'true');
       }
     });
-    status(`??λ맖: ${title}`);
+    status(`저장됨: ${title}`);
     return;
   }
 
   // ===============================
-  // 3) ?쇰컲 ?ㅺ탳(?⑤씫??遺숇뒗 ?ㅺ탳 由ъ뒪?? ???
+  // 3) 일반 설교(단락에 붙는 설교 리스트) 저장
   // ===============================
   if (!CURRENT.paraId) {
     if (!syncCurrentFromOpen()) {
-      alert('?⑤씫??癒쇱? ?좏깮??二쇱꽭??');
+      alert('단락을 먼저 선택해 주세요.');
       return;
     }
     const para = BIBLE.books[CURRENT.book][CURRENT.chap].paras[CURRENT.paraIdx];
@@ -3718,7 +3545,7 @@ el('saveSermon').onclick = () => {
 
   const map = getSermonMap();
   const arr = map[CURRENT.paraId] || [];
-  // editing 蹂?섎뒗 ?꾩뿉???대? ?좎뼵??(2872踰?以?
+  // editing 변수는 위에서 이미 선언됨 (2872번 줄)
 
   if (editing !== '') {
     const i = +editing;
@@ -3740,40 +3567,40 @@ el('saveSermon').onclick = () => {
   }
 
   map[CURRENT.paraId] = arr;
-  const saved = setSermonMap(map, true); // 利됱떆 ???
+  const saved = setSermonMap(map, true); // 즉시 저장
   
-  // ????뺤씤
+  // 저장 확인
   if (!saved) {
-    console.error('?ㅺ탳 ????ㅽ뙣');
-    alert('?ㅺ탳 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??');
+    console.error('설교 저장 실패');
+    alert('설교 저장에 실패했습니다. 다시 시도해 주세요.');
     return;
   }
 
-  // ?ㅺ탳紐⑸줉???쒖떆?섏뼱 ?덉쑝硫?紐⑸줉?쇰줈 ?뚯븘媛湲? ?꾨땲硫??몄쭛湲??좎?
+  // 설교목록이 표시되어 있으면 목록으로 돌아가기, 아니면 편집기 유지
   const hasSermonList = sermonList.innerHTML.trim() !== '';
   const isEditorHidden = sermonEditor.style.display === 'none';
   
-  // ??????ㅺ탳紐⑸줉 媛깆떊 (??λ맂 ?댁슜??諛섏쁺?섎룄濡?
+  // 저장 후 설교목록 갱신 (저장된 내용이 반영되도록)
   if (hasSermonList && isEditorHidden) {
-    // ?ㅺ탳紐⑸줉 紐⑤떖???대젮?덈뒗 寃쎌슦 - 紐⑸줉?쇰줈 ?뚯븘媛湲?
+    // 설교목록 모달이 열려있는 경우 - 목록으로 돌아가기
     sermonEditor.style.display = 'none';
-    renderSermonList(); // ??λ맂 ?댁슜???ㅼ떆 遺덈윭????쒖떆
+    renderSermonList(); // 저장된 내용을 다시 불러와서 표시
   } else {
-    // ?ㅺ탳蹂닿린 ?붾㈃?먯꽌 吏곸젒 ??ν븳 寃쎌슦 - ?몄쭛湲??좎?
-    // ?몄쭛 紐⑤뱶 ?낅뜲?댄듃 (???ㅺ탳媛 異붽???寃쎌슦)
+    // 설교보기 화면에서 직접 저장한 경우 - 편집기 유지
+    // 편집 모드 업데이트 (새 설교가 추가된 경우)
     if (editing === '') {
-      // ???ㅺ탳媛 異붽??섏뿀?쇰?濡?泥?踰덉㎏ ?ㅺ탳濡??몄쭛 紐⑤뱶 ?ㅼ젙
+      // 새 설교가 추가되었으므로 첫 번째 설교로 편집 모드 설정
       sermonEditor.dataset.editing = '0';
     }
-    // ????꾩뿉???몄쭛湲??좎?
+    // 저장 후에도 편집기 유지
     sermonEditor.style.display = '';
-    // ?ㅺ탳紐⑸줉???④꺼???덉뼱????μ? ?꾨즺?섏뿀?쇰?濡? ?섏쨷??紐⑸줉???대㈃ ??λ맂 ?댁슜??蹂댁엫
+    // 설교목록이 숨겨져 있어도 저장은 완료되었으므로, 나중에 목록을 열면 저장된 내용이 보임
   }
   
-  status('?ㅺ탳媛 ??λ릺?덉뒿?덈떎.');
+  status('설교가 저장되었습니다.');
 };
 
-/* ===== RTE ?좏떥 ===== */
+/* ===== RTE 유틸 ===== */
 function isRTE(){ return sermonBody && sermonBody.getAttribute('contenteditable') === 'true'; }
 function getBodyHTML(){ return isRTE() ? sermonBody.innerHTML : (sermonBody.value || ''); }
 function setBodyHTML(html){ if(isRTE()) sermonBody.innerHTML = html || ''; else sermonBody.value = html || ''; }
@@ -3808,7 +3635,7 @@ function execFmt(cmd){
 /* --------- Editor TTS --------- */
 editorSpeakBtn.onclick = ()=> toggleEditorSpeak();
 
-// 臾몄옣 ?⑥쐞 ??룆???꾪븳 ?곹깭
+// 문장 단위 낭독을 위한 상태
 let EDITOR_TTS = {
   sents: [],
   idx: 0,
@@ -3817,7 +3644,7 @@ let EDITOR_TTS = {
   utter: null
 };
 
-// HTML???쇰컲 ?띿뒪?몃줈 蹂??
+// HTML을 일반 텍스트로 변환
 function htmlToPlainText(html) {
   const tmp = document.createElement('div');
   tmp.innerHTML = html || '';
@@ -3825,64 +3652,64 @@ function htmlToPlainText(html) {
   return (tmp.textContent || '').replace(/\s+\n/g, '\n').replace(/\n{2,}/g, '\n').replace(/\s+/g, ' ').trim();
 }
 
-// 臾몄옣 遺꾪븷 (?쒓뎅???곷Ц 醫낃껐遺??湲곗?)
+// 문장 분할 (한국어/영문 종결부호 기준)
 function splitToSentences(text) {
   const t = String(text || '').trim();
   if (!t) return [];
-  // 留덉묠?? 臾쇱쓬?? ?먮굦?? 留먯쨪?꾪몴, ?쒓뎅??醫낃껐(??)???쇰컲 留덉묠?쒕줈 泥섎━
-  const parts = t.split(/(?<=[\.!\???|[?귨펯竊?)\s+/u).filter(s => s && s.trim().length > 0);
+  // 마침표, 물음표, 느낌표, 말줄임표, 한국어 종결(다.)도 일반 마침표로 처리
+  const parts = t.split(/(?<=[\.!\?…]|[。！？])\s+/u).filter(s => s && s.trim().length > 0);
   return parts;
 }
 
 function toggleEditorSpeak(){
-  // speechSynthesis媛 ?놁쑝硫??ъ떆??
+  // speechSynthesis가 없으면 재시도
   if(!EDITOR_TTS.synth) {
     EDITOR_TTS.synth = window.speechSynthesis || null;
-    if(!EDITOR_TTS.synth) return alert('??釉뚮씪?곗????뚯꽦?⑹꽦??吏?먰븯吏 ?딆뒿?덈떎.');
+    if(!EDITOR_TTS.synth) return alert('이 브라우저는 음성합성을 지원하지 않습니다.');
   }
   
-  // ?ъ깮 以묒씤 寃쎌슦 ?쇱떆?뺤?/?ш컻 泥섎━
+  // 재생 중인 경우 일시정지/재개 처리
   if(EDITOR_TTS.playing) {
     if(EDITOR_TTS.synth.speaking && !EDITOR_TTS.synth.paused) {
-      // ?쇱떆?뺤?
+      // 일시정지
       EDITOR_TTS.synth.pause();
-      editorSpeakBtn.textContent = '?ш컻';
+      editorSpeakBtn.textContent = '재개';
       return;
     } else if(EDITOR_TTS.synth.paused) {
-      // ?ш컻
+      // 재개
       EDITOR_TTS.synth.resume();
-      editorSpeakBtn.textContent = '?쇱떆?뺤?';
+      editorSpeakBtn.textContent = '일시정지';
       return;
     } else {
-      // ?ъ깮 以묒씠吏留?speaking??false??寃쎌슦 以묒?
+      // 재생 중이지만 speaking이 false인 경우 중지
       stopEditorSpeak();
       return;
     }
   }
 
-  // ?쒕ぉ怨?蹂몃Ц 媛?몄삤湲?
+  // 제목과 본문 가져오기
   const title = (sermonTitle.value || '').trim();
   const bodyHTML = getBodyHTML();
   const bodyPlain = htmlToPlainText(bodyHTML);
   const fullText = [title, bodyPlain].filter(Boolean).join('. ');
   
   if(!fullText){ 
-    alert('??룆???댁슜???놁뒿?덈떎.'); 
+    alert('낭독할 내용이 없습니다.'); 
     return; 
   }
 
-  // 臾몄옣 ?⑥쐞濡?遺꾪븷
+  // 문장 단위로 분할
   EDITOR_TTS.sents = splitToSentences(fullText);
   if (EDITOR_TTS.sents.length === 0) {
-    alert('??룆???댁슜???놁뒿?덈떎.');
+    alert('낭독할 내용이 없습니다.');
     return;
   }
 
   EDITOR_TTS.idx = 0;
   EDITOR_TTS.playing = true;
-  editorSpeakBtn.textContent = '?쇱떆?뺤?';
+  editorSpeakBtn.textContent = '일시정지';
   
-  // 泥?臾몄옣遺???쒖옉
+  // 첫 문장부터 시작
   speakEditorSentence(0);
 }
 
@@ -3937,8 +3764,8 @@ function stopEditorSpeak(silent){
   EDITOR_TTS.sents = [];
   EDITOR_TTS.idx = 0;
   
-  if(!silent) status('?ㅺ탳 ??룆??以묒??덉뒿?덈떎.'); 
-  editorSpeakBtn.textContent = '??룆';
+  if(!silent) status('설교 낭독을 중지했습니다.'); 
+  editorSpeakBtn.textContent = '낭독';
 }
 
 /* --------- Hotkeys --------- */
@@ -3983,14 +3810,14 @@ window.addEventListener('keydown', (e)=>{
   }
 });
 
-/* === ?앹뾽 ?몄쭛湲?(?ㅽ겕由쏀듃 遺꾨━ 踰꾩쟾) === */
+/* === 팝업 편집기 (스크립트 분리 버전) === */
 function openSermonEditorWindow(idx){
   const map = getSermonMap();
   const arr = map[CURRENT.paraId] || [];
   const it  = arr[idx];
-  // ???ㅺ탳??寃쎌슦(idx媛 0?닿퀬 鍮??ㅺ탳媛 ?덈뒗 寃쎌슦) ?덉슜
+  // 새 설교인 경우(idx가 0이고 빈 설교가 있는 경우) 허용
   if(!it && !(idx === 0 && arr.length > 0 && arr[0].id)){ 
-    alert('?몄쭛???ㅺ탳瑜?李얠쓣 ???놁뒿?덈떎.'); 
+    alert('편집할 설교를 찾을 수 없습니다.'); 
     return; 
   }
 
@@ -4000,7 +3827,7 @@ function openSermonEditorWindow(idx){
   const meta = {
     paraId: CURRENT.paraId,
     idx,
-    ref: `${CURRENT.book} ${CURRENT.chap}??쨌 ${(para?.title || para?.ref || '')} (${para?.ref || ''})`,
+    ref: `${CURRENT.book} ${CURRENT.chap}장 · ${(para?.title || para?.ref || '')} (${para?.ref || ''})`,
     title: it.title || '',
     body:  it.body  || '',
     date:  it.date || '',
@@ -4008,14 +3835,14 @@ function openSermonEditorWindow(idx){
   };
 
   const w = window.open('', '_blank', 'width=1100,height=820');
-  if(!w){ alert('?앹뾽??李⑤떒?섏뿀?듬땲?? 釉뚮씪?곗? ?앹뾽???덉슜?댁＜?몄슂.'); return; }
+  if(!w){ alert('팝업이 차단되었습니다. 브라우저 팝업을 허용해주세요.'); return; }
   w.__WBPS_META__ = meta;
   if (w.opener && w.opener.firebase) { w.firebase = w.opener.firebase; }
 
   let popupHTML = String.raw`<!DOCTYPE html><html lang="ko">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>?ㅺ탳 ?몄쭛</title>
+<title>설교 편집</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&family=Nanum+Myeongjo&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0f1115;--panel:#161922;--text:#e6e8ef;--muted:#9aa0ab;--border:#252a36;--accent:#6ea8fe;--danger:#ff6b6b}
@@ -4038,7 +3865,7 @@ button:hover{border-color:color-mix(in hsl,var(--border) 75%,var(--accent) 25%)}
 .primary{background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 78%,white 10%),color-mix(in srgb,var(--accent) 72%,black 22%));border-color:color-mix(in srgb,var(--accent) 70%,black 10%)}
 .muted{color:var(--muted)}
 
-.context-editor{font-family:"Noto Serif KR","Nanum Myeong怨?,serif;font-size:1.05rem;line-height:1.85;letter-spacing:.02em;word-break:keep-all}
+.context-editor{font-family:"Noto Serif KR","Nanum Myeong고",serif;font-size:1.05rem;line-height:1.85;letter-spacing:.02em;word-break:keep-all}
 
 .notion-header{display:flex;align-items:center;gap:8px;margin-top:8px}
 .notion-header .title{flex:1 1 auto;background:#161922;color:#e6e8ef;border:1px solid #2a3040;border-radius:8px;padding:10px 12px;font-weight:700}
@@ -4046,13 +3873,13 @@ button:hover{border-color:color-mix(in hsl,var(--border) 75%,var(--accent) 25%)}
 .notion-badge{font-size:11px;color:#9aa0ab}
 
 #editorRoot{max-width:880px;margin:12px auto 8px;padding:0 6px}
-#editorRoot.speaking{background:color-mix(in hsl, var(--accent) 12%, black 0%) !important; border-left:3px solid var(--accent) !important; border-radius:8px; padding-left:8px !important}
-#editorRoot .sentence-speaking{background:color-mix(in hsl, var(--accent) 55%, black 0%); border-radius:4px; padding:2px 0; font-weight:700; transition:background 0.2s; animation:pulse-sentence 2s ease-in-out infinite; box-shadow:0 0 0 1px color-mix(in hsl, var(--accent) 45%, black 0%)}
-@keyframes pulse-sentence{ 0%, 100%{ background:color-mix(in hsl, var(--accent) 55%, black 0%) } 50%{ background:color-mix(in hsl, var(--accent) 65%, black 0%) } }
+#editorRoot.speaking{background:color-mix(in hsl, var(--accent) 8%, black 0%) !important; border-left:3px solid var(--accent) !important; border-radius:8px; padding-left:8px !important}
+#editorRoot .sentence-speaking{background:color-mix(in hsl, var(--accent) 30%, black 0%); border-radius:4px; padding:2px 0; font-weight:600; transition:background 0.2s; animation:pulse-sentence 2s ease-in-out infinite}
+@keyframes pulse-sentence{ 0%, 100%{ background:color-mix(in hsl, var(--accent) 30%, black 0%) } 50%{ background:color-mix(in hsl, var(--accent) 40%, black 0%) } }
 
-/* .bubble ?ㅽ????쒓굅??- 怨듯넻 ?뚮줈???대컮 紐⑤뱢 ?ъ슜 */
+/* .bubble 스타일 제거됨 - 공통 플로팅 툴바 모듈 사용 */
 
-/* ?뚮줈???쒖떇?대컮 ?ㅽ???(蹂몃Ц怨??숈씪) */
+/* 플로팅 서식툴바 스타일 (본문과 동일) */
 #wbp-plbar{
   position: fixed; left:0; top:0;
   transform: translate(-50%, calc(-100% - 10px));
@@ -4093,8 +3920,8 @@ button:hover{border-color:color-mix(in hsl,var(--border) 75%,var(--accent) 25%)}
   header, footer, #floatingBar { display:none !important; }
 }
 
-/* === ?몄쭛湲?main) ?ㅽ겕濡?諛?寃뱀묠 諛⑹? 蹂댁젙 === */
-/* body瑜?3??洹몃━???ㅻ뜑/硫붿씤/?명꽣)濡? 硫붿씤? ?ㅽ겕濡?媛??*/
+/* === 편집기(main) 스크롤 및 겹침 방지 보정 === */
+/* body를 3행 그리드(헤더/메인/푸터)로, 메인은 스크롤 가능 */
 body{
   display: grid;
   grid-template-rows: 56px 1fr 56px;
@@ -4102,33 +3929,33 @@ body{
   overflow: hidden !important;
 }
 
-/* main? ?ㅽ겕濡ㅼ씠 媛?ν빐????+ footer/floatingBar??媛由ъ? ?딅룄濡??섎떒 ?щ갚 */
+/* main은 스크롤이 가능해야 함 + footer/floatingBar에 가리지 않도록 하단 여백 */
 main{
   position: relative;
   z-index: 1;
   overflow-y: auto !important;
   padding-top: 12px;
-  padding-bottom: 140px; /* footer ?믪씠 + ?ъ쑀 */
+  padding-bottom: 140px; /* footer 높이 + 여유 */
   height: calc(100vh - 112px) !important; /* 56(header)+56(footer) */
 }
 
-/* ?몄쭛 ?곸뿭 ?먯껜 ?щ갚 ?뺣낫(?꾨옒履?異⑸텇???꾩썙??寃뱀묠 諛⑹?) */
+/* 편집 영역 자체 여백 확보(아래쪽 충분히 띄워서 겹침 방지) */
 #editorRoot{
   position: relative;
   z-index: 1;
   max-width: 880px;
-  margin: 12px auto 100px;  /* ?꾨옒 ?ъ쑀 */
+  margin: 12px auto 100px;  /* 아래 여유 */
   overflow: visible;
 }
 
-/* ?뚮줈??踰꾪듉怨쇱쓽 寃뱀묠??理쒖냼???꾩슂 ?? */
+/* 플로팅 버튼과의 겹침도 최소화(필요 시) */
 #floatingBar{
   z-index: 50;
 }
 html, body { height:auto !important; overflow:auto !important; }
 main { height:auto !important; overflow:visible !important; }
 
-/* === 臾몄옣 ??룆 ?섏씠?쇱씠?몄슜 ?쎄린 ?⑤꼸 === */
+/* === 문장 낭독 하이라이트용 읽기 패널 === */
 #readPane{
   position: fixed;
   right: 16px;
@@ -4158,26 +3985,26 @@ main { height:auto !important; overflow:visible !important; }
 </head>
 <body class="context-editor">
 <header>
-  <strong>?ㅺ탳 ?몄쭛</strong><span class="muted" id="ref"></span>
+  <strong>설교 편집</strong><span class="muted" id="ref"></span>
   <div class="grow"></div>
-  <button id="x">?リ린</button>
+  <button id="x">닫기</button>
 </header>
 
 <main>
-  <input id="t" class="title-input" type="text" autocomplete="off" placeholder="?ㅺ탳 ?쒕ぉ???낅젰?섏꽭??>
+  <input id="t" class="title-input" type="text" autocomplete="off" placeholder="설교 제목을 입력하세요">
   <div class="notion-header">
-    <input id="neTitle" class="title" placeholder="?쒕ぉ???낅젰?섏꽭?? />
+    <input id="neTitle" class="title" placeholder="제목을 입력하세요" />
     <div class="meta">
-      <button id="nePublish" class="primary">寃뚯떆</button>
-      <button id="neStt">?럺 STT</button>
+      <button id="nePublish" class="primary">게시</button>
+      <button id="neStt">🎙 STT</button>
     </div>
   </div>
 
-  <!-- ?뚮줈???쒖떇?대컮(蹂몃Ц ?덈Ц?μ슜怨??숈씪) -->
-  <div id="wbp-plbar" hidden role="toolbar" aria-label="???쒖떇">
-    <button type="button" data-cmd="createLink" title="留곹겕 (Ctrl+K)">?뵕</button>
+  <!-- 플로팅 서식툴바(본문 절문장용과 동일) -->
+  <div id="wbp-plbar" hidden role="toolbar" aria-label="절 서식">
+    <button type="button" data-cmd="createLink" title="링크 (Ctrl+K)">🔗</button>
     <div class="divider"></div>
-    <!-- ?ш린 ?ㅼ뿉 6???붾젅??+ 湲고? ?쒕∼?ㅼ슫??JS濡?二쇱엯?⑸땲??-->
+    <!-- 여기 뒤에 6색 팔레트 + 기타 드롭다운이 JS로 주입됩니다 -->
   </div>
 
   <div id="editorRoot" class="rte" contenteditable="true" spellcheck="false" aria-label="Sermon Editor" style="min-height:360px;resize:vertical;padding:14px;background:#161922;border:1px solid #2a3040;border-radius:10px;line-height:1.85;letter-spacing:.015em;caret-color:var(--accent);outline:none"></div>
@@ -4185,30 +4012,30 @@ main { height:auto !important; overflow:visible !important; }
   <div id="readPane" aria-label="Reading Sentences"></div>
 
   <div class="notion-footer">
-    <div class="notion-badge" id="neAutosave">?먮룞????湲곗쨷??/div>
+    <div class="notion-badge" id="neAutosave">자동저장 대기중…</div>
     <details style="margin-top:6px">
-      <summary>?렒 Sermon Tracer 濡쒓렇/??꾨씪??/summary>
+      <summary>🎧 Sermon Tracer 로그/타임라인</summary>
       <div id="traceLog"></div>
     </details>
   </div>
 </main>
 
-<div id="floatingBar" aria-label="?꾧뎄 留됰?">
-  <button id="btnInsertBibleFloating" class="primary">?깃꼍援ъ젅</button>
+<div id="floatingBar" aria-label="도구 막대">
+  <button id="btnInsertBibleFloating" class="primary">성경구절</button>
 </div>
 
 <footer>
   <span class="muted" id="date"></span><div class="grow"></div>
-  <button id="print">?몄뇙(A4)</button>
-  <button id="read" class="primary">??룆</button>
-  <button id="stop">以묒?</button>
-  <button class="danger" id="d">??젣</button>
-  <button class="primary" id="s">???/button>
+  <button id="print">인쇄(A4)</button>
+  <button id="read" class="primary">낭독</button>
+  <button id="stop">중지</button>
+  <button class="danger" id="d">삭제</button>
+  <button class="primary" id="s">저장</button>
 </footer>
 </body>
 </html>`;
 
-  // ?쒗뵆由?蹂닿컙 諛?</script> 蹂댄샇
+  // 템플릿 보간 및 </script> 보호
   popupHTML = popupHTML.replaceAll('${', '\\${');
   popupHTML = popupHTML.replaceAll('</script>', '<\\/script>');
 
@@ -4216,10 +4043,10 @@ main { height:auto !important; overflow:visible !important; }
   w.document.write(popupHTML);
   w.document.close();
 
-  // ?앹뾽 珥덇린???ㅽ뻾
+  // 팝업 초기화 실행
   initSermonPopup(w);
 
-  // 遺紐⑥갹 硫붿떆吏 ?몃뱾??(?????젣 諛섏쁺)
+  // 부모창 메시지 핸들러 (저장/삭제 반영)
   const onMsg = (ev) => {
     const data = ev?.data || {};
     if (!data.type) return;
@@ -4231,30 +4058,30 @@ main { height:auto !important; overflow:visible !important; }
       const now  = new Date();
       const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
       
-      // ???ㅺ탳??寃쎌슦 (idx媛 諛곗뿴 踰붿쐞瑜?踰쀬뼱?섍굅???대떦 ?몃뜳?ㅼ뿉 ??ぉ???녿뒗 寃쎌슦)
+      // 새 설교인 경우 (idx가 배열 범위를 벗어나거나 해당 인덱스에 항목이 없는 경우)
       if (!arr2[idx]) {
-        // ???ㅺ탳 異붽?: idx媛 0?닿퀬 泥?踰덉㎏ ??ぉ??鍮??ㅺ탳??寃쎌슦 ?대떦 ??ぉ??id ?ъ슜
+        // 새 설교 추가: idx가 0이고 첫 번째 항목이 빈 설교인 경우 해당 항목의 id 사용
         let newId;
         if (idx === 0 && arr2.length > 0 && arr2[0] && arr2[0].id) {
           newId = arr2[0].id;
-          // 鍮??ㅺ탳瑜??ㅼ젣 ?댁슜?쇰줈 援먯껜
+          // 빈 설교를 실제 내용으로 교체
           arr2[0] = { id: newId, title: data.title, body: data.body, images: data.images || [], date, link: arr2[0].link || '' };
         } else {
           newId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
-          // 諛곗뿴??idx蹂대떎 ?묒쑝硫??뺤옣
+          // 배열이 idx보다 작으면 확장
           while (arr2.length <= idx) {
             arr2.push(null);
           }
           arr2[idx] = { id: newId, title: data.title, body: data.body, images: data.images || [], date, link: '' };
         }
       } else {
-        // 湲곗〈 ?ㅺ탳 ?낅뜲?댄듃 (鍮??ㅺ탳???낅뜲?댄듃)
+        // 기존 설교 업데이트 (빈 설교도 업데이트)
         arr2[idx] = { ...arr2[idx], title: data.title, body: data.body, images: data.images || arr2[idx].images || [], date };
       }
       
       map2[CURRENT.paraId] = arr2;
       setSermonMap(map2);
-      status('?ㅺ탳媛 ??λ릺?덉뒿?덈떎.');
+      status('설교가 저장되었습니다.');
       window.removeEventListener('message', onMsg);
     }
 
@@ -4262,8 +4089,8 @@ main { height:auto !important; overflow:visible !important; }
       if (arr2[idx]) arr2.splice(idx, 1);
       map2[CURRENT.paraId] = arr2;
       setSermonMap(map2);
-      status('?ㅺ탳媛 ??젣?섏뿀?듬땲??');
-      // ?ㅺ탳 ??젣 ???⑤씫 ?꾨옒 ?ㅺ탳 ?뺣낫???쒓굅
+      status('설교가 삭제되었습니다.');
+      // 설교 삭제 시 단락 아래 설교 정보도 제거
       const paraEl = document.querySelector(`details.para[data-book="${CURRENT.book}"][data-ch="${CURRENT.chap}"][data-idx="${CURRENT.paraIdx}"]`);
       if (paraEl) {
         const pbody = paraEl.querySelector('.pbody');
@@ -4278,18 +4105,18 @@ main { height:auto !important; overflow:visible !important; }
   window.addEventListener('message', onMsg);
 }
 
-/* ===== ?앹뾽 ?대? ?ㅽ겕由쏀듃 ===== */
+/* ===== 팝업 내부 스크립트 ===== */
 function initSermonPopup(win){
   const w = win, d = w.document;
 
-    // ===== 以묐났 ?쒕ぉ ?낅젰 ?④린湲??앹뾽 ?쒖젙) =====
+    // ===== 중복 제목 입력 숨기기(팝업 한정) =====
   (function removeDuplicateTitle() {
     const d = win.document;
-    // ?꾩옱 ?ъ슜 以묒씤 ?쒕ぉ ?낅젰移?
+    // 현재 사용 중인 제목 입력칸
     const mainTitle = d.getElementById('neTitle');
     if (!mainTitle) return;
 
-    // ?덉쟾 ?쒕ぉ input(#t ?????덈떎硫??④?
+    // 예전 제목 input(#t 등)이 있다면 숨김
     const dupCandidates = [
       ...d.querySelectorAll('input#t, input[type="text"].title-input')
     ].filter(el => el !== mainTitle);
@@ -4304,8 +4131,8 @@ function initSermonPopup(win){
   const $ = id => d.getElementById(id);
   const meta = w.__WBPS_META__ || {};
 
-  $('ref').textContent  = ' ??' + (meta.ref || '');
-  $('date').textContent = meta.date ? ('理쒓렐 ??? ' + meta.date) : '';
+  $('ref').textContent  = ' — ' + (meta.ref || '');
+  $('date').textContent = meta.date ? ('최근 저장: ' + meta.date) : '';
 
   $('t').value = meta.title || '';
   $('neTitle').value = meta.title || '';
@@ -4315,14 +4142,14 @@ function initSermonPopup(win){
   const neAutosave= $('neAutosave');
   const editorMain = neRoot.closest('main') || d.body;
 
-  // ?⑥닚 contenteditable ?먮뵒??珥덇린??
+  // 단순 contenteditable 에디터 초기화
   if (!neRoot.innerHTML || /^\s*$/.test(neRoot.innerHTML)) {
-    neRoot.innerHTML = '<p>?ш린???ㅺ탳瑜??묒꽦?섏꽭??</p>';
+    neRoot.innerHTML = '<p>여기에 설교를 작성하세요.</p>';
   }
 
-  // ?봺 怨듯넻 ?뚮줈???대컮 紐⑤뱢 ?ъ슜 (蹂몃Ц ?덈Ц?μ슜怨??숈씪)
+  // 🔁 공통 플로팅 툴바 모듈 사용 (본문 절문장용과 동일)
   if (wbpPlbar && neRoot && typeof createFloatingToolbar === 'function') {
-    // 7???붾젅??二쇱엯 (?곗깋 ?ы븿, 湲고????쒕∼?ㅼ슫 ?쒓굅)
+    // 7색 팔레트 주입 (흰색 포함, 기타색 드롭다운 제거)
     (function injectPalette(){
       if(wbpPlbar.querySelector('.wbp-colors')) return;
       const PALETTE = ['#ff4d4f','#faad14','#fadb14','#52c41a','#1677ff','#722ed1','#ffffff'];
@@ -4331,7 +4158,7 @@ function initSermonPopup(win){
       PALETTE.forEach(hex=>{
         const b = d.createElement('button');
         b.type='button'; 
-        b.title=hex === '#ffffff' ? '?곗깋' : hex; 
+        b.title=hex === '#ffffff' ? '흰색' : hex; 
         b.style.cssText=`width:22px;height:22px;border-radius:5px;border:1px solid ${hex === '#ffffff' ? '#666' : '#2a3040'};background:${hex};`;
         b.addEventListener('click', ()=>{
           d.execCommand?.('foreColor', false, hex);
@@ -4342,7 +4169,7 @@ function initSermonPopup(win){
       wbpPlbar.appendChild(wrap);
     })();
 
-    // selectionFilter: ?먮뵒??猷⑦듃 ?덉뿉?쒕쭔 ?덉슜
+    // selectionFilter: 에디터 루트 안에서만 허용
     function inEditor() {
       const sel = w.getSelection();
       if (!sel || sel.rangeCount === 0) return false;
@@ -4351,18 +4178,18 @@ function initSermonPopup(win){
       const el = (c.nodeType === 1 ? c : c.parentElement);
       if (!el) return false;
 
-      // ?먮뵒??猷⑦듃 ?덉뿉 ?덈뒗吏 ?뺤씤
+      // 에디터 루트 안에 있는지 확인
       return neRoot.contains(el);
     }
 
-    // 紐낅졊 ?몃뱾?? execCommand ???먮룞???
+    // 명령 핸들러: execCommand 후 자동저장
     function handleCommand(cmd, val) {
       d.execCommand(cmd, false, val);
       NscheduleAutosave();
     }
 
-    // ?됱긽 ?낅젰 ?붿냼 李얘린 (?붾젅?몃뒗 踰꾪듉?대?濡?null)
-    const vcolor = null; // 蹂몃Ц怨??щ━ ?됱긽 ?낅젰? ?붾젅?몃줈 泥섎━
+    // 색상 입력 요소 찾기 (팔레트는 버튼이므로 null)
+    const vcolor = null; // 본문과 달리 색상 입력은 팔레트로 처리
 
     createFloatingToolbar({
       barElement: wbpPlbar,
@@ -4375,16 +4202,16 @@ function initSermonPopup(win){
     });
   }
 
-  // ?⑥닚 HTML 媛?몄삤湲??ㅼ젙 ?⑥닔
+  // 단순 HTML 가져오기/설정 함수
   function getEditorHTML(){
     return neRoot.innerHTML || '';
   }
   
   function setEditorHTML(html){
-    neRoot.innerHTML = html || '<p>?ш린???ㅺ탳瑜??묒꽦?섏꽭??</p>';
+    neRoot.innerHTML = html || '<p>여기에 설교를 작성하세요.</p>';
   }
 
-  // ?낅젰 ?대깽??由ъ뒪??異붽?
+  // 입력 이벤트 리스너 추가
   neRoot.addEventListener('input', ()=> {
     NscheduleAutosave();
   });
@@ -4392,18 +4219,18 @@ function initSermonPopup(win){
   let NsaveTimer=null;
   function NscheduleAutosave(){
     clearTimeout(NsaveTimer);
-    neAutosave.textContent = '?낅젰 以묅?;
+    neAutosave.textContent = '입력 중…';
     NsaveTimer = setTimeout(()=>{
       try{
         const key = `wbps.sermon.draft.${(meta.paraId||'')}.${(meta.idx||0)}`;
         const payload = { title: ($('neTitle').value||''), body: getEditorHTML(), ts: Date.now() };
         saveState(key, payload);
-        neAutosave.textContent = '?먮룞??λ맖';
-      }catch(_){ neAutosave.textContent = '?먮룞????ㅽ뙣(?⑸웾)'; }
+        neAutosave.textContent = '자동저장됨';
+      }catch(_){ neAutosave.textContent = '자동저장 실패(용량)'; }
     }, 500);
   }
 
-  // 珥덇린?? 湲곗〈 HTML 濡쒕뱶
+  // 초기화: 기존 HTML 로드
   (function Ninit(){
     if (meta.body) {
       setEditorHTML(meta.body);
@@ -4411,29 +4238,29 @@ function initSermonPopup(win){
     setTimeout(()=>{ neRoot.focus(); }, 60);
   })();
 
-  // 怨듯넻 ?⑥닔: HTML???쇰컲 ?띿뒪?몃줈 蹂??
+  // 공통 함수: HTML을 일반 텍스트로 변환
   function htmlToPlain(html){
     const tmp=d.createElement('div'); tmp.innerHTML=html||'';
     tmp.querySelectorAll('sup').forEach(s=> s.textContent='['+s.textContent+'] ');
     return (tmp.textContent||'').replace(/\s+\n/g,'\n').replace(/\n{2,}/g,'\n').replace(/\s+/g,' ').trim();
   }
   
-  // 怨듯넻 ?⑥닔: 臾몄옣 遺꾪븷
+  // 공통 함수: 문장 분할
   function splitToSentences(text){
     const t = String(text||'').trim();
     if(!t) return [];
-    const parts = t.split(/(?<=[\.!\???|[?귨펯竊?)\s+/u).filter(s=>s && s.trim().length>0);
+    const parts = t.split(/(?<=[\.!\?…]|[。！？])\s+/u).filter(s=>s && s.trim().length>0);
     return parts;
   }
   
-  // 怨듯넻 ?⑥닔: ?ㅺ탳 ?몄쭛湲곗쓽 紐⑤뱺 臾몄옣 異붿텧 (STT? ??룆 紐⑤몢?먯꽌 ?ъ슜)
+  // 공통 함수: 설교 편집기의 모든 문장 추출 (STT와 낭독 모두에서 사용)
   function extractAllSentences(){
     const html = getEditorHTML();
     const title = (d.getElementById('neTitle').value || d.getElementById('t').value || '').trim();
     const plain = [title, htmlToPlain(html)].filter(Boolean).join('. ');
     const sents = splitToSentences(plain);
     
-    // 媛?臾몄옣???랁븳 ?붿냼 李얘린 (contenteditable 吏곸젒 ?ъ슜)
+    // 각 문장이 속한 요소 찾기 (contenteditable 직접 사용)
     const editorRoot = d.getElementById('editorRoot');
     const sentEls = [];
     
@@ -4453,7 +4280,7 @@ function initSermonPopup(win){
     return { sentences: sents, elements: sentEls };
   }
   
-  // 怨듯넻 ?⑥닔: 臾몄옣 ?섏씠?쇱씠???쒓굅 (STT? ??룆 紐⑤몢?먯꽌 ?ъ슜)
+  // 공통 함수: 문장 하이라이트 제거 (STT와 낭독 모두에서 사용)
   function clearSentenceHighlight(){
     const editorRoot = d.getElementById('editorRoot');
     if (!editorRoot) return;
@@ -4468,7 +4295,7 @@ function initSermonPopup(win){
     editorRoot.classList.remove('speaking');
   }
   
-  // 怨듯넻 ?⑥닔: 臾몄옣 ?섏씠?쇱씠??(STT? ??룆 紐⑤몢?먯꽌 ?ъ슜)
+  // 공통 함수: 문장 하이라이트 (STT와 낭독 모두에서 사용)
   function highlightSentence(sentIndex, sentEl){
     if (!sentEl || sentIndex < 0) return;
     
@@ -4477,21 +4304,21 @@ function initSermonPopup(win){
     const { block, content, sentence } = sentEl;
     if (!block || !content) return;
     
-    // ?먮뵒?곗뿉 speaking ?대옒??異붽?
+    // 에디터에 speaking 클래스 추가
     if (block === d.getElementById('editorRoot')) {
       block.classList.add('speaking');
     }
     
-    // 臾몄옣??span?쇰줈 媛먯떥???섏씠?쇱씠??
+    // 문장을 span으로 감싸서 하이라이트
     const contentText = htmlToPlain(content.innerHTML);
     const sentenceStart = contentText.indexOf(sentence);
     
     if (sentenceStart === -1) {
-      // 臾몄옣??李얠? 紐삵븳 寃쎌슦 釉붾줉留??섏씠?쇱씠??
+      // 문장을 찾지 못한 경우 블록만 하이라이트
       return;
     }
     
-    // ?띿뒪???몃뱶?먯꽌 臾몄옣 ?꾩튂 李얘린
+    // 텍스트 노드에서 문장 위치 찾기
     const walker = d.createTreeWalker(
       content,
       NodeFilter.SHOW_TEXT,
@@ -4524,7 +4351,7 @@ function initSermonPopup(win){
       currentPos += textLen;
     }
     
-    // 臾몄옣??span?쇰줈 媛먯떥湲?
+    // 문장을 span으로 감싸기
     if (startNode && endNode) {
       try {
         const range = d.createRange();
@@ -4533,19 +4360,18 @@ function initSermonPopup(win){
         
         const span = d.createElement('span');
         span.className = 'sentence-speaking';
-        span.style.background = 'color-mix(in hsl, var(--accent) 55%, black 0%)';
+        span.style.background = 'color-mix(in hsl, var(--accent) 30%, black 0%)';
         span.style.borderRadius = '4px';
         span.style.padding = '2px 0';
         span.style.transition = 'background 0.2s';
         span.style.fontWeight = '600';
-        span.style.boxShadow = '0 0 0 1px color-mix(in hsl, var(--accent) 45%, black 0%)';
         
         range.surroundContents(span);
         
-        // 釉붾줉???붾㈃??蹂댁씠?꾨줉 ?ㅽ겕濡?
+        // 블록이 화면에 보이도록 스크롤
         block.scrollIntoView({block:'center', behavior:'smooth'});
       } catch (e) {
-        // 踰붿쐞媛 ?щ윭 ?몃뱶??嫄몄퀜 ?덈뒗 寃쎌슦
+        // 범위가 여러 노드에 걸쳐 있는 경우
         try {
           const range = d.createRange();
           range.setStart(startNode, startOffset);
@@ -4554,18 +4380,17 @@ function initSermonPopup(win){
           const contents = range.extractContents();
           const span = d.createElement('span');
           span.className = 'sentence-speaking';
-          span.style.background = 'color-mix(in hsl, var(--accent) 55%, black 0%)';
+          span.style.background = 'color-mix(in hsl, var(--accent) 30%, black 0%)';
           span.style.borderRadius = '4px';
           span.style.padding = '2px 0';
           span.style.transition = 'background 0.2s';
           span.style.fontWeight = '600';
-          span.style.boxShadow = '0 0 0 1px color-mix(in hsl, var(--accent) 45%, black 0%)';
           span.appendChild(contents);
           range.insertNode(span);
           
           block.scrollIntoView({block:'center', behavior:'smooth'});
         } catch (e2) {
-          console.warn('臾몄옣 ?섏씠?쇱씠???ㅽ뙣:', e2);
+          console.warn('문장 하이라이트 실패:', e2);
         }
       }
     }
@@ -4574,25 +4399,25 @@ function initSermonPopup(win){
   // STT with Sentence Highlighting
   (function(){
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if(!SR){ console.warn('STT 誘몄???); return; }
+    if(!SR){ console.warn('STT 미지원'); return; }
     const rec = new SR(); rec.lang='ko-KR'; rec.interimResults=true; rec.continuous=true;
 
     let activeBlock=null, accText='', startedAt=null;
-    let currentHighlightedIndex = -1; // ?꾩옱 ?섏씠?쇱씠?몃맂 臾몄옣 ?몃뜳??
-    let allSentences = []; // 紐⑤뱺 臾몄옣 諛곗뿴
-    let sentenceElements = []; // 媛?臾몄옣???랁븳 DOM ?붿냼 諛곗뿴
+    let currentHighlightedIndex = -1; // 현재 하이라이트된 문장 인덱스
+    let allSentences = []; // 모든 문장 배열
+    let sentenceElements = []; // 각 문장이 속한 DOM 요소 배열
     
     function getActive(){ return d.getElementById('editorRoot'); }
-    function setProgress(block, ratio){ /* 吏꾪뻾瑜??쒖떆 ?쒓굅 (?⑥닚 ?먮뵒?곗뿉?쒕뒗 遺덊븘?? */ }
-    function plain(html){ return htmlToPlain(html); } // 怨듯넻 ?⑥닔 ?ъ슜
+    function setProgress(block, ratio){ /* 진행률 표시 제거 (단순 에디터에서는 불필요) */ }
+    function plain(html){ return htmlToPlain(html); } // 공통 함수 사용
     function sim(a,b){ a=a.replace(/\s+/g,''); b=b.replace(/\s+/g,''); const L=Math.max(a.length,1); let m=0; for(let i=0;i<Math.min(a.length,b.length);i++){ if(a[i]===b[i]) m++; } return m/L; }
-    function nextBlock(block){ return null; /* ?⑥닚 ?먮뵒?곗뿉?쒕뒗 ?ㅼ쓬 釉붾줉 媛쒕뀗 ?놁쓬 */ }
+    function nextBlock(block){ return null; /* 단순 에디터에서는 다음 블록 개념 없음 */ }
     
-    // clearSentenceHighlight? highlightSentence???꾩뿉??怨듯넻 ?⑥닔濡??뺤쓽??(??룆 ?뱀뀡怨?怨듭쑀)
+    // clearSentenceHighlight와 highlightSentence는 위에서 공통 함수로 정의됨 (낭독 섹션과 공유)
     
-    // ?뚯꽦 ?몄떇 ?띿뒪?몄? 臾몄옣 留ㅼ묶
+    // 음성 인식 텍스트와 문장 매칭
     function matchSentence(recognizedText){
-      if (!recognizedText || recognizedText.trim().length < 5) return -1;
+      if (!recognizedText || recognizedText.trim().length < 3) return -1;
       
       const normalized = recognizedText.replace(/\s+/g, '').toLowerCase();
       const searchStart = Math.max(0, currentHighlightedIndex);
@@ -4600,7 +4425,7 @@ function initSermonPopup(win){
       
       let bestMatch = -1;
       let bestScore = 0;
-      const threshold = 0.72; // 유사도 임계값 강화
+      const threshold = 0.6; // 유사도 임계값
       
       for (let i = searchStart; i < searchEnd; i++) {
         const sent = allSentences[i];
@@ -4608,8 +4433,8 @@ function initSermonPopup(win){
         
         const sentNormalized = sent.replace(/\s+/g, '').toLowerCase();
         
-        // 부분 일치 (최소 길이 8 이상만 허용)
-        if ((normalized.length >= 8) && (sentNormalized.includes(normalized) || normalized.includes(sentNormalized))) {
+        // 부분 일치 체크
+        if (sentNormalized.includes(normalized) || normalized.includes(sentNormalized)) {
           const score = Math.min(normalized.length, sentNormalized.length) / Math.max(normalized.length, sentNormalized.length);
           if (score > bestScore && score >= threshold) {
             bestScore = score;
@@ -4617,7 +4442,7 @@ function initSermonPopup(win){
           }
         }
         
-        // 유사도 계산 (간단 문자 기반)
+        // 유사도 계산 (간단한 문자열 유사도)
         const similarity = sim(normalized, sentNormalized);
         if (similarity > bestScore && similarity >= threshold) {
           bestScore = similarity;
@@ -4633,20 +4458,20 @@ function initSermonPopup(win){
       if(neSttBtn.dataset.on==='1'){
         rec.stop();
         neSttBtn.dataset.on='0';
-        neSttBtn.textContent='?럺 STT';
+        neSttBtn.textContent='🎙 STT';
         clearSentenceHighlight();
         currentHighlightedIndex = -1;
         return;
       }
       
-      // 臾몄옣 異붿텧
+      // 문장 추출
       const extracted = extractAllSentences();
       allSentences = extracted.sentences;
       sentenceElements = extracted.elements;
       currentHighlightedIndex = -1;
       
       if (allSentences.length === 0) {
-        w.alert('?ㅺ탳 ?댁슜???놁뒿?덈떎. 癒쇱? ?ㅺ탳瑜??묒꽦?댁＜?몄슂.');
+        w.alert('설교 내용이 없습니다. 먼저 설교를 작성해주세요.');
         return;
       }
       
@@ -4655,7 +4480,7 @@ function initSermonPopup(win){
       startedAt=Date.now();
       rec.start();
       neSttBtn.dataset.on='1';
-      neSttBtn.textContent='??以묒?';
+      neSttBtn.textContent='⏸ 중지';
     });
 
     rec.onresult = (ev)=>{
@@ -4666,7 +4491,7 @@ function initSermonPopup(win){
       
       accText += (isFinal ? txt + ' ' : txt);
       
-      // 吏꾪뻾瑜??쒖떆 ?쒓굅 (?⑥닚 ?먮뵒?곗뿉?쒕뒗 遺덊븘??
+      // 진행률 표시 제거 (단순 에디터에서는 불필요)
 
       const t = ((Date.now()-startedAt)/1000).toFixed(1);
       const neTrace = d.getElementById('traceLog');
@@ -4675,7 +4500,7 @@ function initSermonPopup(win){
         neTrace.scrollTop = neTrace.scrollHeight;
       }
 
-      // 臾몄옣 留ㅼ묶 諛??섏씠?쇱씠??(理쒖쥌 寃곌낵???뚮쭔)
+      // 문장 매칭 및 하이라이트 (최종 결과일 때만)
       if (isFinal && txt.trim().length >= 3) {
         const matchedIndex = matchSentence(txt);
         if (matchedIndex >= 0 && matchedIndex < sentenceElements.length) {
@@ -4684,7 +4509,7 @@ function initSermonPopup(win){
         }
       }
 
-      // 釉붾줉 ?꾨즺 泥댄겕 ?쒓굅 (?⑥닚 ?먮뵒?곗뿉?쒕뒗 遺덊븘??
+      // 블록 완료 체크 제거 (단순 에디터에서는 불필요)
     };
     
     rec.onend = ()=>{
@@ -4694,9 +4519,9 @@ function initSermonPopup(win){
     };
     
     rec.onerror = (e)=> {
-      console.warn('STT ?ㅻ쪟', e.error);
+      console.warn('STT 오류', e.error);
       if (e.error === 'no-speech') {
-        // ?뚯꽦???놁쓣 ?뚮뒗 ?먮룞 ?ъ떆??
+        // 음성이 없을 때는 자동 재시작
         if(neSttBtn.dataset.on==='1'){
           setTimeout(() => rec.start(), 1000);
         }
@@ -4704,18 +4529,18 @@ function initSermonPopup(win){
     };
   })();
 
-  // 寃뚯떆(Firebase ?듭뀡)
+  // 게시(Firebase 옵션)
   const nePubBtn = d.getElementById('nePublish');
   nePubBtn?.addEventListener('click', async ()=>{
     try{
-      if(typeof w.firebase === 'undefined'){ w.alert('Firebase 誘명깙?? 寃뚯떆 湲곕뒫???ъ슜?섎젮硫?SDK/珥덇린?붽? ?꾩슂?⑸땲??'); return; }
+      if(typeof w.firebase === 'undefined'){ w.alert('Firebase 미탑재: 게시 기능을 사용하려면 SDK/초기화가 필요합니다.'); return; }
       const user = w.firebase.auth().currentUser;
-      if(!user){ w.alert('濡쒓렇????寃뚯떆 媛?ν빀?덈떎.'); return; }
+      if(!user){ w.alert('로그인 후 게시 가능합니다.'); return; }
 
       const db = w.firebase.firestore();
       const docRef = NSTATE.docId ? db.collection('sermons').doc(NSTATE.docId) : db.collection('sermons').doc();
       const payload = {
-        title: (d.getElementById('neTitle').value||'臾댁젣'),
+        title: (d.getElementById('neTitle').value||'무제'),
         blocks: NSTATE.blocks,
         owner: user.uid,
         updatedAt: w.firebase.firestore.FieldValue.serverTimestamp(),
@@ -4725,45 +4550,45 @@ function initSermonPopup(win){
       await docRef.set(payload, {merge:true});
       NSTATE.docId = docRef.id;
       const url = w.location.origin + '/viewer.html?id=' + docRef.id;
-      w.alert('寃뚯떆 ?꾨즺!\n' + url);
-    }catch(err){ console.error(err); w.alert('寃뚯떆 ?ㅽ뙣: '+err.message); }
+      w.alert('게시 완료!\n' + url);
+    }catch(err){ console.error(err); w.alert('게시 실패: '+err.message); }
   });
 
-  // ?깃꼍援ъ젅 ?쎌엯
+  // 성경구절 삽입
   d.getElementById('btnInsertBibleFloating')?.addEventListener('click', insertBiblePrompt);
   async function insertBiblePrompt(){
-    const raw = w.prompt('?쎌엯???깃꼍援ъ젅 (?? ??3:16, 李쎌꽭湲?1:1-3)');
+    const raw = w.prompt('삽입할 성경구절 (예: 요 3:16, 창세기 1:1-3)');
     if(!raw) return;
-    const norm=String(raw).replace(/\s+/g,' ').replace(/[?볛뷂펾]/g,'-').replace(/[竊?/g,':').trim();
+    const norm=String(raw).replace(/\s+/g,' ').replace(/[–—－]/g,'-').replace(/[：]/g,':').trim();
     const m=norm.match(/^(.+?)\s+(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?$/);
-    if(!m){ w.alert('?뺤떇: ?깃꼍?대쫫 ?????먮뒗 ??????); return; }
+    if(!m){ w.alert('형식: 성경이름 장:절 또는 장:절-절'); return; }
     const bookRaw=m[1], chap=parseInt(m[2],10), vFrom=parseInt(m[3],10), vTo=m[4]?parseInt(m[4],10):parseInt(m[3],10);
 
     let BOOKS;
     try{ BOOKS = await getBooksInPopup(); }
-    catch(e){ w.alert(e.message || '?깃꼍 ?곗씠?곕? 遺덈윭?????놁뒿?덈떎.'); return; }
+    catch(e){ w.alert(e.message || '성경 데이터를 불러올 수 없습니다.'); return; }
 
     const bookKey=resolveBookKey(bookRaw,BOOKS);
-    if(!bookKey){ w.alert(`?대떦 ?깃꼍??李얠쓣 ???놁뒿?덈떎: "${bookRaw}"`); return; }
+    if(!bookKey){ w.alert(`해당 성경을 찾을 수 없습니다: "${bookRaw}"`); return; }
 
     const ch=BOOKS[bookKey]?.[chap];
-    if(!ch){ w.alert(`"${bookKey}" ${chap}?μ쓣 李얠쓣 ???놁뒿?덈떎.`); return; }
+    if(!ch){ w.alert(`"${bookKey}" ${chap}장을 찾을 수 없습니다.`); return; }
 
     const verses=(ch.paras||[]).flatMap(p=>p.verses||[]).filter(([v])=>v>=vFrom&&v<=vTo);
-    if(!verses.length){ w.alert('?대떦 援ъ젅??李얠쓣 ???놁뒿?덈떎.'); return; }
+    if(!verses.length){ w.alert('해당 구절을 찾을 수 없습니다.'); return; }
 
     const header = `<div class="verse-header">&lt;${bookKey} ${chap}:${vFrom}${vTo!==vFrom?'-'+vTo:''}&gt;</div>`;
     const html = verses.map(([v,t])=>`<span class="verse-line"><sup>${v}</sup>${t}</span>`).join('');
     const blockHTML = header + html;
 
-    // contenteditable??吏곸젒 ?쎌엯
+    // contenteditable에 직접 삽입
     const editorRoot = d.getElementById('editorRoot');
     if (editorRoot) {
       const p = d.createElement('p');
       p.innerHTML = blockHTML;
       editorRoot.appendChild(p);
       NscheduleAutosave();
-      // ?ъ빱?ㅻ? ?덈줈 異붽????붿냼濡??대룞
+      // 포커스를 새로 추가된 요소로 이동
       const sel = w.getSelection();
       const range2 = d.createRange();
       range2.selectNodeContents(p);
@@ -4773,20 +4598,20 @@ function initSermonPopup(win){
     }
   }
 
-  // ?????젣/?リ린/?몄뇙
-  // 20251114 12:48 援먯껜
+  // 저장/삭제/닫기/인쇄
+  // 20251114 12:48 교체
   d.getElementById('s').onclick = ()=>{
     let html = getEditorHTML();
 
-    // ??1) ?댁슜???녿뒗 <p>??/p> 鍮?以??쒓굅
+    // ✅ 1) 내용이 없는 <p>…</p> 빈 줄 제거
     html = html.replace(/<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*/gi, '');
 
-    // ??2) 以꾨컮轅?3媛??댁긽 ??2媛쒕줈 異뺤냼
+    // ✅ 2) 줄바꿈 3개 이상 → 2개로 축소
     html = html.replace(/\n{3,}/g, '\n\n');
 
     const title =
         (d.getElementById('neTitle').value || d.getElementById('t').value || '').trim()
-        || '(?쒕ぉ ?놁쓬)';
+        || '(제목 없음)';
 
     const images = [];
 
@@ -4802,13 +4627,13 @@ function initSermonPopup(win){
 
     w.close();
     };
-  // 20251114 12:48 援먯껜
+  // 20251114 12:48 교체
 
-  d.getElementById('d').onclick = ()=>{ if(w.confirm('??젣?좉퉴??')){ w.opener?.postMessage?.({ type:'sermon-delete' }, '*'); w.close(); } };
+  d.getElementById('d').onclick = ()=>{ if(w.confirm('삭제할까요?')){ w.opener?.postMessage?.({ type:'sermon-delete' }, '*'); w.close(); } };
   d.getElementById('x').onclick = ()=> w.close();
   d.getElementById('print').onclick = ()=> w.print();
 
-  /* ========= 臾몄옣 ?⑥쐞 ??룆 + ?섏씠?쇱씠??+ ?붾㈃ 以묒븰 ?뺣젹 ========= */
+  /* ========= 문장 단위 낭독 + 하이라이트 + 화면 중앙 정렬 ========= */
   const readBtn = d.getElementById('read');
   const stopBtn = d.getElementById('stop');
   const readPane = d.getElementById('readPane');
@@ -4821,7 +4646,7 @@ function initSermonPopup(win){
     utter: null
   };
 
-  // htmlToPlain怨?splitToSentences???꾩뿉??怨듯넻 ?⑥닔濡??뺤쓽??(STT ?뱀뀡怨?怨듭쑀)
+  // htmlToPlain과 splitToSentences는 위에서 공통 함수로 정의됨 (STT 섹션과 공유)
 
   function renderReadPane(){
     readPane.innerHTML = TTS.sents.map((s,i)=>`<span class="sent" data-i="${i}">${escapeHtml(s)}</span>`).join('');
@@ -4832,7 +4657,7 @@ function initSermonPopup(win){
     readPane.querySelectorAll('.sent.reading').forEach(el=> el.classList.remove('reading'));
   }
 
-  // ??룆??臾몄옣 ?붿냼 ???(STT 湲곕뒫怨??숈씪??援ъ“ ?ъ슜)
+  // 낭독용 문장 요소 저장 (STT 기능과 동일한 구조 사용)
   let readingSentenceElements = [];
   
   function highlightIndex(i){
@@ -4843,14 +4668,14 @@ function initSermonPopup(win){
       span.scrollIntoView({block:'center', behavior:'smooth'});
     }
     
-    // ?몄쭛湲?蹂몃Ц?먮룄 ?섏씠?쇱씠??(STT 湲곕뒫怨??숈씪???⑥닔 ?ъ슜)
+    // 편집기 본문에도 하이라이트 (STT 기능과 동일한 함수 사용)
     if (i >= 0 && i < readingSentenceElements.length) {
       highlightSentence(i, readingSentenceElements[i]);
     }
   }
 
   function speakIdx(i){
-    // speechSynthesis媛 ?놁쑝硫??ъ떆??
+    // speechSynthesis가 없으면 재시도
     if(!TTS.synth) {
       TTS.synth = w.speechSynthesis || window.speechSynthesis || null;
       if(!TTS.synth) return;
@@ -4859,7 +4684,7 @@ function initSermonPopup(win){
     TTS.idx = i;
     try{ TTS.synth.cancel(); }catch(_){}
     const u = new w.SpeechSynthesisUtterance(TTS.sents[i]);
-    // 遺紐⑥갹 ?뚯꽦 ?ㅼ젙??洹몃?濡??댁슜?섏? 紐삵븯誘濡?湲곕낯 ko-KR濡??ㅼ젙
+    // 부모창 음성 설정을 그대로 이용하지 못하므로 기본 ko-KR로 설정
     u.lang = 'ko-KR';
     u.onstart = ()=>{
       highlightIndex(i);
@@ -4873,7 +4698,7 @@ function initSermonPopup(win){
         stopReading();
       }
     };
-    u.onerror = ()=>{ // ?ㅻ쪟 ???ㅼ쓬 臾몄옣?쇰줈 ?섏뼱媛??臾댄븳猷⑦봽 諛⑹?
+    u.onerror = ()=>{ // 오류 시 다음 문장으로 넘어가되 무한루프 방지
       if(!TTS.playing) return;
       const next = i+1;
       if(next < TTS.sents.length) speakIdx(next); else stopReading();
@@ -4883,16 +4708,16 @@ function initSermonPopup(win){
   }
 
   function startReading(){
-    // STT 湲곕뒫怨??숈씪??諛⑹떇?쇰줈 臾몄옣 異붿텧
+    // STT 기능과 동일한 방식으로 문장 추출
     const extracted = extractAllSentences();
     const sents = extracted.sentences;
-    if(!sents.length){ w.alert('??룆???댁슜???놁뒿?덈떎.'); return; }
+    if(!sents.length){ w.alert('낭독할 내용이 없습니다.'); return; }
     TTS.sents = sents;
-    readingSentenceElements = extracted.elements; // STT? ?숈씪??援ъ“ ?ъ슜
+    readingSentenceElements = extracted.elements; // STT와 동일한 구조 사용
     TTS.idx = 0;
     TTS.playing = true;
     renderReadPane();
-    readBtn.textContent = '?쇱떆?뺤?';
+    readBtn.textContent = '일시정지';
     speakIdx(0);
   }
 
@@ -4901,29 +4726,29 @@ function initSermonPopup(win){
     try{ TTS.synth && TTS.synth.cancel(); }catch(_){}
     clearPaneHighlight();
     
-    // ?몄쭛湲?蹂몃Ц ?섏씠?쇱씠?몃룄 ?쒓굅 (STT 湲곕뒫怨??숈씪???⑥닔 ?ъ슜)
+    // 편집기 본문 하이라이트도 제거 (STT 기능과 동일한 함수 사용)
     clearSentenceHighlight();
     
     readPane.style.display = 'none';
-    readBtn.textContent = '??룆';
+    readBtn.textContent = '낭독';
   }
 
   readBtn.onclick = ()=>{
-    // speechSynthesis媛 ?놁쑝硫??ъ떆??
+    // speechSynthesis가 없으면 재시도
     if(!TTS.synth) {
       TTS.synth = w.speechSynthesis || window.speechSynthesis || null;
-      if(!TTS.synth){ w.alert('??釉뚮씪?곗????뚯꽦?⑹꽦??吏?먰븯吏 ?딆뒿?덈떎.'); return; }
+      if(!TTS.synth){ w.alert('이 브라우저는 음성합성을 지원하지 않습니다.'); return; }
     }
     if(!TTS.playing){
       startReading();
     }else{
-      // ?쇱떆?뺤? ?좉?: ?쇱떆?뺤? -> ?ш컻
+      // 일시정지 토글: 일시정지 -> 재개
       if(TTS.synth.speaking && !TTS.synth.paused){
         TTS.synth.pause();
-        readBtn.textContent = '?ш컻';
+        readBtn.textContent = '재개';
       }else if(TTS.synth.paused){
         TTS.synth.resume();
-        readBtn.textContent = '?쇱떆?뺤?';
+        readBtn.textContent = '일시정지';
       }else{
         startReading();
       }
@@ -4932,7 +4757,7 @@ function initSermonPopup(win){
 
   stopBtn.onclick = ()=> stopReading();
 
-  // 臾몄옣 ?대┃ ???대떦 臾몄옣遺???ъ깮
+  // 문장 클릭 시 해당 문장부터 재생
   readPane.addEventListener('click', (e)=>{
     const span = e.target.closest('.sent');
     if(!span) return;
@@ -4940,17 +4765,17 @@ function initSermonPopup(win){
     if(!Number.isFinite(i)) return;
     if(!TTS.sents.length) return;
     TTS.playing = true;
-    readBtn.textContent = '?쇱떆?뺤?';
+    readBtn.textContent = '일시정지';
     speakIdx(i);
   });
 
-  // ?????젣/?リ린/??룆 ??
-  /* ========= 臾몄옣 ?⑥쐞 ??룆 ?뱀뀡 ??========= */
+  // 저장/삭제/닫기/낭독 끝
+  /* ========= 문장 단위 낭독 섹션 끝 ========= */
 
-  // 湲곗〈 以묒? 踰꾪듉 ?몃뱾?щ뒗 ?꾩뿉???泥? stopReading )濡?泥섎━??
-  // 湲곗〈 ?⑥씪-臾몄옣 ?꾩껜 ??룆 濡쒖쭅? ?붽뎄?ы빆??留욎떠 臾몄옣 ?⑥쐞濡?移섑솚??
+  // 기존 중지 버튼 핸들러는 위에서 대체( stopReading )로 처리됨
+  // 기존 단일-문장 전체 낭독 로직은 요구사항에 맞춰 문장 단위로 치환됨
 
-  // ?깃꼍 ?곗씠??濡쒕뱶 ?좏떥
+  // 성경 데이터 로드 유틸
   let __BOOKS_CACHE = null;
   async function getBooksInPopup(){
     if (__BOOKS_CACHE) return __BOOKS_CACHE;
@@ -4970,7 +4795,7 @@ function initSermonPopup(win){
       }catch(_){ return null; }
     }
     __BOOKS_CACHE = await tryLoad('bible_paragraphs.json') || await tryLoad('bible-paragraphs.json');
-    if(!__BOOKS_CACHE) throw new Error('?깃꼍 ?곗씠??BIBLE)瑜?遺덈윭?????놁뒿?덈떎.');
+    if(!__BOOKS_CACHE) throw new Error('성경 데이터(BIBLE)를 불러올 수 없습니다.');
     return __BOOKS_CACHE;
   }
 
@@ -4983,38 +4808,38 @@ function initSermonPopup(win){
     return null;
   }
   function normalizeBookName(x){
-    return String(x||'').toLowerCase().replace(/\s+/g,'').replace(/[.\u00B7]/g,'').replace(/??/,'').replace(/蹂듭쓬??$/,'蹂듭쓬')
-    .replace(/泥レ㎏|?섏㎏|?뗭㎏/g, m=>({'泥レ㎏':'1','?섏㎏':'2','?뗭㎏':'3'}[m])).replace(/[?쇱씠??/g,m=>({'??:'1','??:'2','??:'3'}[m]))
-    .replace(/濡ъ꽌?$/,'濡?).replace(/怨좊┛?꾩쟾??$/,'怨좎쟾').replace(/怨좊┛?꾪썑??$/,'怨좏썑')
-    .replace(/?곗궡濡쒕땲媛?꾩꽌?$/,'?댁쟾').replace(/?곗궡濡쒕땲媛?꾩꽌?$/,'?댄썑')
-    .replace(/?붾え?곗쟾??$/,'?ㅼ쟾').replace(/?붾え?고썑??$/,'?ㅽ썑')
-    .replace(/踰좊뱶濡쒖쟾??$/,'踰㏃쟾').replace(/踰좊뱶濡쒗썑??$/,'踰㏉썑')
-    .replace(/?뷀븳?쇱꽌?$/,'??').replace(/?뷀븳?댁꽌?$/,'??').replace(/?뷀븳?쇱꽌?$/,'??');
+    return String(x||'').toLowerCase().replace(/\s+/g,'').replace(/[.\u00B7]/g,'').replace(/서$/,'').replace(/복음서?$/,'복음')
+    .replace(/첫째|둘째|셋째/g, m=>({'첫째':'1','둘째':'2','셋째':'3'}[m])).replace(/[일이삼]/g,m=>({'일':'1','이':'2','삼':'3'}[m]))
+    .replace(/롬서?$/,'롬').replace(/고린도전서?$/,'고전').replace(/고린도후서?$/,'고후')
+    .replace(/데살로니가전서?$/,'살전').replace(/데살로니가후서?$/,'살후')
+    .replace(/디모데전서?$/,'딤전').replace(/디모데후서?$/,'딤후')
+    .replace(/베드로전서?$/,'벧전').replace(/베드로후서?$/,'벧후')
+    .replace(/요한일서?$/,'요1').replace(/요한이서?$/,'요2').replace(/요한삼서?$/,'요3');
   }
   function BOOK_ALIAS_MAP(){
     return {
-      // 援ъ빟
-      '李?:'李쎌꽭湲?,'李쎌꽭湲?:'李쎌꽭湲?,'李쎌꽭':'李쎌꽭湲?,'異?:'異쒖븷援쎄린','異쒖븷援쎄린':'異쒖븷援쎄린','異쒖븷':'異쒖븷援쎄린','??:'?덉쐞湲?,'?덉쐞湲?:'?덉쐞湲?,'誘?:'誘쇱닔湲?,'誘쇱닔湲?:'誘쇱닔湲?,'??:'?좊챸湲?,'?좊챸湲?:'?좊챸湲?,
-      '??:'?ы샇?섏븘','?ы샇?섏븘':'?ы샇?섏븘','??:'?ъ궗湲?,'?ъ궗湲?:'?ъ궗湲?,'猷?:'猷산린','猷산린':'猷산린','?쇱긽':'?щТ?섏긽','?щТ?섏긽':'?щТ?섏긽','?쇳븯':'?щТ?섑븯','?щТ?섑븯':'?щТ?섑븯',
-      '?뺤긽':'?댁솗湲곗긽','?댁솗湲곗긽':'?댁솗湲곗긽','?뺥븯':'?댁솗湲고븯','?댁솗湲고븯':'?댁솗湲고븯','???:'?????,'?????:'?????,'???:'?????,'?????:'?????,
-      '??:'?먯뒪??,'?먯뒪??:'?먯뒪??,'??:'?먰뿤誘몄빞','?먰뿤誘몄빞':'?먰뿤誘몄빞','??:'?먯뒪??,'?먯뒪??:'?먯뒪??,'??:'?κ린','?κ린':'?κ린','??:'?쒗렪','?쒗렪':'?쒗렪','??:'?좎뼵','?좎뼵':'?좎뼵',
-      '??:'?꾨룄??,'?꾨룄??:'?꾨룄??,'??:'?꾧?','?꾧?':'?꾧?','??:'?댁궗??,'?댁궗??:'?댁궗??,'??:'?덈젅誘몄빞','?덈젅誘몄빞':'?덈젅誘몄빞','??:'?덈젅誘몄빞?좉?','?덈젅誘몄빞?좉?':'?덈젅誘몄빞?좉?',
-      '寃?:'?먯뒪寃?,'?먯뒪寃?:'?먯뒪寃?,'??:'?ㅻ땲??,'?ㅻ땲??:'?ㅻ땲??,'??:'?몄꽭??,'?몄꽭??:'?몄꽭??,'??:'?붿뿕','?붿뿕':'?붿뿕','??:'?꾨え??,'?꾨え??:'?꾨え??,'??:'?ㅻ컮??,'?ㅻ컮??:'?ㅻ컮??,
-      '??:'?붾굹','?붾굹':'?붾굹','誘?:'誘멸?','誘멸?':'誘멸?','??:'?섑썡','?섑썡':'?섑썡','??:'?섎컯援?,'?섎컯援?:'?섎컯援?,'??:'?ㅻ컮??,'?ㅻ컮??:'?ㅻ컮??,'??:'?숆컻','?숆컻':'?숆컻','??:'?ㅺ???,'?ㅺ???:'?ㅺ???,'留?:'留먮씪湲?,'留먮씪湲?:'留먮씪湲?,
-      // ?좎빟
-      '留?:'留덊깭蹂듭쓬','留덊깭':'留덊깭蹂듭쓬','留덊깭蹂듭쓬':'留덊깭蹂듭쓬','留?:'留덇?蹂듭쓬','留덇?':'留덇?蹂듭쓬','留덇?蹂듭쓬':'留덇?蹂듭쓬','??:'?꾧?蹂듭쓬','?꾧?':'?꾧?蹂듭쓬','?꾧?蹂듭쓬':'?꾧?蹂듭쓬',
-      '??:'?뷀븳蹂듭쓬','?뷀븳蹂듭쓬':'?뷀븳蹂듭쓬','??:'?щ룄?됱쟾','?щ룄?됱쟾':'?щ룄?됱쟾','濡?:'濡쒕쭏??,'濡쒕쭏??:'濡쒕쭏??,'怨좎쟾':'怨좊┛?꾩쟾??,'怨좊┛?꾩쟾??:'怨좊┛?꾩쟾??,'怨좏썑':'怨좊┛?꾪썑??,'怨좊┛?꾪썑??:'怨좊┛?꾪썑??,
-      '媛?:'媛덈씪?붿븘??,'媛덈씪?붿븘??:'媛덈씪?붿븘??,'??:'?먮쿋?뚯꽌','?먮쿋?뚯꽌':'?먮쿋?뚯꽌','鍮?:'鍮뚮┰蹂댁꽌','鍮뚮┰蹂댁꽌':'鍮뚮┰蹂댁꽌','怨?:'怨⑤줈?덉꽌','怨⑤줈?덉꽌':'怨⑤줈?덉꽌',
-      '?댁쟾':'?곗궡濡쒕땲媛?꾩꽌','?곗궡濡쒕땲媛?꾩꽌':'?곗궡濡쒕땲媛?꾩꽌','?댄썑':'?곗궡濡쒕땲媛?꾩꽌','?곗궡濡쒕땲媛?꾩꽌':'?곗궡濡쒕땲媛?꾩꽌','?ㅼ쟾':'?붾え?곗쟾??,'?붾え?곗쟾??:'?붾え?곗쟾??,'?ㅽ썑':'?붾え?고썑??,'?붾え?고썑??:'?붾え?고썑??,
-      '??:'?붾룄??,'?붾룄??:'?붾룄??,'紐?:'鍮뚮젅紐ъ꽌','鍮뚮젅紐ъ꽌':'鍮뚮젅紐ъ꽌','??:'?덈툕由ъ꽌','?덈툕由ъ꽌':'?덈툕由ъ꽌','??:'?쇨퀬蹂댁꽌','?쇨퀬蹂댁꽌':'?쇨퀬蹂댁꽌',
-      '踰㏃쟾':'踰좊뱶濡쒖쟾??,'踰좊뱶濡쒖쟾??:'踰좊뱶濡쒖쟾??,'踰㏉썑':'踰좊뱶濡쒗썑??,'踰좊뱶濡쒗썑??:'踰좊뱶濡쒗썑??,
-      '??':'?뷀븳?쇱꽌','?붿씪1':'?뷀븳?쇱꽌','?뷀븳??:'?뷀븳?쇱꽌','?뷀븳?쇱꽌':'?뷀븳?쇱꽌','??':'?뷀븳?댁꽌','?붿씪2':'?뷀븳?댁꽌','?뷀븳??:'?뷀븳?댁꽌','?뷀븳?댁꽌':'?뷀븳?댁꽌',
-      '??':'?뷀븳?쇱꽌','?붿씪3':'?뷀븳?쇱꽌','?뷀븳??:'?뷀븳?쇱꽌','?뷀븳?쇱꽌':'?뷀븳?쇱꽌','??:'?좊떎??,'?좊떎??:'?좊떎??,'怨?:'?뷀븳怨꾩떆濡?,'怨꾩떆濡?:'?뷀븳怨꾩떆濡?,'?뷀븳怨꾩떆濡?:'?뷀븳怨꾩떆濡?
+      // 구약
+      '창':'창세기','창세기':'창세기','창세':'창세기','출':'출애굽기','출애굽기':'출애굽기','출애':'출애굽기','레':'레위기','레위기':'레위기','민':'민수기','민수기':'민수기','신':'신명기','신명기':'신명기',
+      '수':'여호수아','여호수아':'여호수아','삿':'사사기','사사기':'사사기','룻':'룻기','룻기':'룻기','삼상':'사무엘상','사무엘상':'사무엘상','삼하':'사무엘하','사무엘하':'사무엘하',
+      '왕상':'열왕기상','열왕기상':'열왕기상','왕하':'열왕기하','열왕기하':'열왕기하','대상':'역대상','역대상':'역대상','대하':'역대하','역대하':'역대하',
+      '스':'에스라','에스라':'에스라','느':'느헤미야','느헤미야':'느헤미야','에':'에스더','에스더':'에스더','욥':'욥기','욥기':'욥기','시':'시편','시편':'시편','잠':'잠언','잠언':'잠언',
+      '전':'전도서','전도서':'전도서','아':'아가','아가':'아가','사':'이사야','이사야':'이사야','렘':'예레미야','예레미야':'예레미야','애':'예레미야애가','예레미야애가':'예레미야애가',
+      '겔':'에스겔','에스겔':'에스겔','단':'다니엘','다니엘':'다니엘','호':'호세아','호세아':'호세아','욜':'요엘','요엘':'요엘','암':'아모스','아모스':'아모스','옵':'오바댜','오바댜':'오바댜',
+      '욘':'요나','요나':'요나','미':'미가','미가':'미가','나':'나훔','나훔':'나훔','합':'하박국','하박국':'하박국','습':'스바냐','스바냐':'스바냐','학':'학개','학개':'학개','슥':'스가랴','스가랴':'스가랴','말':'말라기','말라기':'말라기',
+      // 신약
+      '마':'마태복음','마태':'마태복음','마태복음':'마태복음','막':'마가복음','마가':'마가복음','마가복음':'마가복음','눅':'누가복음','누가':'누가복음','누가복음':'누가복음',
+      '요':'요한복음','요한복음':'요한복음','행':'사도행전','사도행전':'사도행전','롬':'로마서','로마서':'로마서','고전':'고린도전서','고린도전서':'고린도전서','고후':'고린도후서','고린도후서':'고린도후서',
+      '갈':'갈라디아서','갈라디아서':'갈라디아서','엡':'에베소서','에베소서':'에베소서','빌':'빌립보서','빌립보서':'빌립보서','골':'골로새서','골로새서':'골로새서',
+      '살전':'데살로니가전서','데살로니가전서':'데살로니가전서','살후':'데살로니가후서','데살로니가후서':'데살로니가후서','딤전':'디모데전서','디모데전서':'디모데전서','딤후':'디모데후서','디모데후서':'디모데후서',
+      '딛':'디도서','디도서':'디도서','몬':'빌레몬서','빌레몬서':'빌레몬서','히':'히브리서','히브리서':'히브리서','약':'야고보서','야고보서':'야고보서',
+      '벧전':'베드로전서','베드로전서':'베드로전서','벧후':'베드로후서','베드로후서':'베드로후서',
+      '요1':'요한일서','요일1':'요한일서','요한일':'요한일서','요한일서':'요한일서','요2':'요한이서','요일2':'요한이서','요한이':'요한이서','요한이서':'요한이서',
+      '요3':'요한삼서','요일3':'요한삼서','요한삼':'요한삼서','요한삼서':'요한삼서','유':'유다서','유다서':'유다서','계':'요한계시록','계시록':'요한계시록','요한계시록':'요한계시록'
     }
   }
 }
 
-/* ===== 紐⑤떖 RTE ?곷떒 ?⑤뵫 ?먮룞 蹂댁젙 ===== */
+/* ===== 모달 RTE 상단 패딩 자동 보정 ===== */
 function adjustModalEditorPadding() {
   const wrap = document.getElementById('rteToolbar');
   const body = document.querySelector('#sermonEditor .rte');
@@ -5026,22 +4851,22 @@ window.addEventListener('resize', adjustModalEditorPadding);
 document.getElementById('sermonTitle')?.addEventListener('input', adjustModalEditorPadding);
 window.addEventListener('load', adjustModalEditorPadding);
 
-/* ===== ?몃씪???쒕ぉ ?몄쭛 ?붾? ===== */
-function startInlineTitleEdit(){ /* ?꾩슂 ???ㅼ젣 援ы쁽?쇰줈 援먯껜 */ }
+/* ===== 인라인 제목 편집 더미 ===== */
+function startInlineTitleEdit(){ /* 필요 시 실제 구현으로 교체 */ }
 
-/* === 怨듯넻 ?뚮줈???대컮 紐⑤뱢 === */
+/* === 공통 플로팅 툴바 모듈 === */
 function createFloatingToolbar(options) {
   const {
-    barElement,           // ?대컮 DOM ?붿냼
-    colorElement,        // ?됱긽 ?낅젰 ?붿냼 (optional)
-    rootContainer,       // 猷⑦듃 而⑦뀒?대꼫 (?? #doc, #editorRoot)
-    selectionFilter,     // ?좏깮 ?꾪꽣 ?⑥닔 (?? inVerse)
-    commandHandler,      // 紐낅졊 ?ㅽ뻾 ?⑥닔 (湲곕낯: document.execCommand)
-    windowObj = window,  // window 媛앹껜 (?앹뾽??寃쎌슦 ?앹뾽??window)
-    docObj = document    // document 媛앹껜 (?앹뾽??寃쎌슦 ?앹뾽??document)
+    barElement,           // 툴바 DOM 요소
+    colorElement,        // 색상 입력 요소 (optional)
+    rootContainer,       // 루트 컨테이너 (예: #doc, #editorRoot)
+    selectionFilter,     // 선택 필터 함수 (예: inVerse)
+    commandHandler,      // 명령 실행 함수 (기본: document.execCommand)
+    windowObj = window,  // window 객체 (팝업일 경우 팝업의 window)
+    docObj = document    // document 객체 (팝업일 경우 팝업의 document)
   } = options;
   
-  // ?붾쾭洹?濡쒓렇 ?⑥닔 蹂꾩묶
+  // 디버그 로그 함수 별칭
   const addDebugLog = window.__addDebugLog || (() => {});
 
   if (!barElement || !rootContainer) {
@@ -5086,58 +4911,58 @@ function createFloatingToolbar(options) {
     const sel = w.getSelection();
     if (!sel || sel.rangeCount === 0) {
       if (DEBUG) {
-        console.log('[showBar] ?좏깮 ?놁쓬');
-        addDebugLog('??showBar: ?좏깮 ?놁쓬', 'error');
+        console.log('[showBar] 선택 없음');
+        addDebugLog('❌ showBar: 선택 없음', 'error');
       }
       hide();
       return;
     }
     
-    // ?좏깮??collapsed?몄? ?뺤씤
+    // 선택이 collapsed인지 확인
     if (sel.isCollapsed) {
       if (DEBUG) {
-        console.log('[showBar] ?좏깮 collapsed');
-        addDebugLog('??showBar: ?좏깮 collapsed', 'error');
+        console.log('[showBar] 선택 collapsed');
+        addDebugLog('❌ showBar: 선택 collapsed', 'error');
       }
       hide();
       return;
     }
 
-    // selectionFilter 泥댄겕 (紐⑤떖 泥댄겕??inVerse?먯꽌 泥섎━)
+    // selectionFilter 체크 (모달 체크는 inVerse에서 처리)
     if (selectionFilter && !selectionFilter()) {
       if (DEBUG) {
-        console.log('[showBar] selectionFilter ?ㅽ뙣');
-        addDebugLog('??showBar: selectionFilter ?ㅽ뙣', 'error');
+        console.log('[showBar] selectionFilter 실패');
+        addDebugLog('❌ showBar: selectionFilter 실패', 'error');
       }
       hide();
       return;
     }
     
     if (DEBUG) {
-      addDebugLog('??showBar: selectionFilter ?듦낵', 'success');
+      addDebugLog('✅ showBar: selectionFilter 통과', 'success');
     }
     
-    // selectionFilter媛 ?듦낵?덈떎硫? 紐⑤떖???대젮?덉뼱???좏깮? ?덉슜??寃껋엯?덈떎.
-    // inVerse() ?⑥닔媛 ?대? #tree ?대? ?좏깮怨?#sermonEditor ?대? ?좏깮???덉슜?덉쑝誘濡?
-    // ?ш린?쒕뒗 異붽? 紐⑤떖 泥댄겕瑜??섏? ?딆뒿?덈떎.
+    // selectionFilter가 통과했다면, 모달이 열려있어도 선택은 허용된 것입니다.
+    // inVerse() 함수가 이미 #tree 내부 선택과 #sermonEditor 내부 선택을 허용했으므로
+    // 여기서는 추가 모달 체크를 하지 않습니다.
 
     const rect = selRect();
     if (!rect || (rect.width === 0 && rect.height === 0)) {
       if (DEBUG) {
-        console.log('[showBar] rect ?놁쓬 ?먮뒗 ?ш린 0');
-        addDebugLog('??showBar: rect ?놁쓬 ?먮뒗 ?ш린 0', 'error');
+        console.log('[showBar] rect 없음 또는 크기 0');
+        addDebugLog('❌ showBar: rect 없음 또는 크기 0', 'error');
       }
       hide();
       return;
     }
 
-    // ?쒕옒洹명븳 遺遺??꾩뿉 ?뺥솗??諛곗튂
-    // 以묒븰 ?뺣젹: left = ?좏깮 ?곸뿭 以묒븰 - ?대컮 ?덈퉬??50%
-    // ?꾩뿉 諛곗튂: top = ?좏깮 ?곸뿭 ?꾩そ - ?대컮 ?믪씠 - ?щ갚
+    // 드래그한 부분 위에 정확히 배치
+    // 중앙 정렬: left = 선택 영역 중앙 - 툴바 너비의 50%
+    // 위에 배치: top = 선택 영역 위쪽 - 툴바 높이 - 여백
     const centerX = rect.left + rect.width / 2;
     const topY = rect.top;
     
-    // transform???ъ슜?섏뿬 以묒븰 ?뺣젹
+    // transform을 사용하여 중앙 정렬
     barElement.style.left = centerX + 'px';
     barElement.style.top = (topY - 10) + 'px';
     barElement.style.transform = 'translate(-50%, -100%)';
@@ -5150,9 +4975,9 @@ function createFloatingToolbar(options) {
         barElementId: barElement.id,
         barElementTag: barElement.tagName
       };
-      console.log('[showBar] ???대컮 ?쒖떆', info);
-      addDebugLog(`???대컮 ?쒖떆 ?깃났!`, 'success');
-      addDebugLog(`  - ?꾩튂: (${centerX.toFixed(0)}, ${topY.toFixed(0)})`, 'info');
+      console.log('[showBar] ✅ 툴바 표시', info);
+      addDebugLog(`✅ 툴바 표시 성공!`, 'success');
+      addDebugLog(`  - 위치: (${centerX.toFixed(0)}, ${topY.toFixed(0)})`, 'info');
       addDebugLog(`  - rect: ${rect.width.toFixed(0)}x${rect.height.toFixed(0)}`, 'info');
     }
     
@@ -5163,11 +4988,11 @@ function createFloatingToolbar(options) {
     const DEBUG = window.__DEBUG_FLOATING_TOOLBAR || false;
     barElement.hidden = true;
     if (DEBUG) {
-      addDebugLog('?몓截??대컮 ?④?', 'info');
+      addDebugLog('👁️ 툴바 숨김', 'info');
     }
   }
 
-  // ?대컮 ?대┃ ?대깽??
+  // 툴바 클릭 이벤트
   barElement.addEventListener('mousedown', e => e.preventDefault());
   barElement.addEventListener('click', e => {
     const btn = e.target.closest('button');
@@ -5179,14 +5004,14 @@ function createFloatingToolbar(options) {
     const mark = btn.dataset.mark;
     const action = btn.dataset.action;
 
-    // 紐낅졊 ?ㅽ뻾
+    // 명령 실행
     const execCmd = commandHandler || ((cmd, val) => d.execCommand(cmd, false, val));
 
     if (cmd) {
       if (cmd === 'createLink') {
         const sel = w.getSelection();
         if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-          const url = w.prompt('留곹겕 URL???낅젰?섏꽭??', 'https://');
+          const url = w.prompt('링크 URL을 입력하세요:', 'https://');
           if (url) {
             execCmd('createLink', false, url);
           }
@@ -5200,7 +5025,7 @@ function createFloatingToolbar(options) {
     }
 
     if (mark) {
-      // ?ㅺ탳 ?앹뾽??留덊겕 紐낅졊
+      // 설교 팝업용 마크 명령
       execCmd(
         mark === 'highlight' ? 'backColor' : mark,
         mark === 'highlight' ? '#6655007a' : null
@@ -5236,14 +5061,14 @@ function createFloatingToolbar(options) {
     }
 
     if (action === 'link') {
-      const url = w.prompt('留곹겕 URL');
+      const url = w.prompt('링크 URL');
       if (url) execCmd('createLink', url);
       saveSel();
       if (!selectionFilter || selectionFilter()) showBar();
     }
   });
 
-  // ?됱긽 ?낅젰 ?대깽??
+  // 색상 입력 이벤트
   if (colorElement) {
     colorElement.addEventListener('input', () => {
       if (!restoreSel()) return;
@@ -5254,90 +5079,90 @@ function createFloatingToolbar(options) {
     });
   }
 
-  // ?대깽??由ъ뒪???깅줉
+  // 이벤트 리스너 등록
   const containerEl = typeof rootContainer === 'string' 
     ? d.querySelector(rootContainer) 
     : rootContainer;
 
-  // ?붾컮?댁떛???꾪븳 蹂??(以묐났 ?몄텧 諛⑹?)
+  // 디바운싱을 위한 변수 (중복 호출 방지)
   let lastSelectionTime = 0;
   let mouseupTimeout = null;
-  let isProcessing = false; // 泥섎━ 以??뚮옒洹?(臾댄븳 猷⑦봽 諛⑹?)
+  let isProcessing = false; // 처리 중 플래그 (무한 루프 방지)
   
   function triggerShowBar() {
     const DEBUG = window.__DEBUG_FLOATING_TOOLBAR || false;
     
-    // ?대? 泥섎━ 以묒씠硫?臾댁떆 (臾댄븳 猷⑦봽 諛⑹?)
+    // 이미 처리 중이면 무시 (무한 루프 방지)
     if (isProcessing) {
       if (DEBUG) {
-        console.log('[triggerShowBar] ?대? 泥섎━ 以? 臾댁떆');
-        addDebugLog('?좑툘 triggerShowBar: ?대? 泥섎━ 以?, 'warn');
+        console.log('[triggerShowBar] 이미 처리 중, 무시');
+        addDebugLog('⚠️ triggerShowBar: 이미 처리 중', 'warn');
       }
       return;
     }
     
-    // 以묐났 ?몄텧 諛⑹?: 50ms ?대궡???곗냽 ?몄텧? 臾댁떆 (20ms?먯꽌 50ms濡?利앷?)
+    // 중복 호출 방지: 50ms 이내의 연속 호출은 무시 (20ms에서 50ms로 증가)
     const now = Date.now();
     if (now - lastSelectionTime < 50) {
       if (DEBUG) {
-        addDebugLog(`?좑툘 triggerShowBar: 以묐났 ?몄텧 諛⑹? (${now - lastSelectionTime}ms ??`, 'warn');
+        addDebugLog(`⚠️ triggerShowBar: 중복 호출 방지 (${now - lastSelectionTime}ms 전)`, 'warn');
       }
       return;
     }
     lastSelectionTime = now;
     
-    // 泥섎━ 以??뚮옒洹??ㅼ젙
+    // 처리 중 플래그 설정
     isProcessing = true;
     
     try {
-      // ?좏깮???꾨즺?섏뿀?붿? ?뺤씤 ??利됱떆 ?쒖떆
+      // 선택이 완료되었는지 확인 후 즉시 표시
       if (DEBUG) {
         const sel = w.getSelection();
         const hasSelection = sel && sel.rangeCount > 0 && !sel.isCollapsed;
-        console.log('[triggerShowBar] ?몄텧', {
+        console.log('[triggerShowBar] 호출', {
           hasSelection,
           hasSelectionFilter: !!selectionFilter
         });
-        addDebugLog(`?뵒 triggerShowBar ?몄텧 (hasSelection: ${hasSelection})`, 'info');
+        addDebugLog(`🔔 triggerShowBar 호출 (hasSelection: ${hasSelection})`, 'info');
       }
       
       if (!selectionFilter || selectionFilter()) {
         if (DEBUG) {
-          console.log('[triggerShowBar] ??selectionFilter ?듦낵, showBar() ?몄텧');
-          addDebugLog('??selectionFilter ?듦낵, showBar() ?몄텧', 'success');
+          console.log('[triggerShowBar] ✅ selectionFilter 통과, showBar() 호출');
+          addDebugLog('✅ selectionFilter 통과, showBar() 호출', 'success');
         }
         showBar();
       } else {
         if (DEBUG) {
-          console.log('[triggerShowBar] ??selectionFilter ?ㅽ뙣, hide() ?몄텧');
-          addDebugLog('??selectionFilter ?ㅽ뙣, hide() ?몄텧', 'error');
+          console.log('[triggerShowBar] ❌ selectionFilter 실패, hide() 호출');
+          addDebugLog('❌ selectionFilter 실패, hide() 호출', 'error');
         }
         hide();
       }
     } catch (e) {
       console.warn('triggerShowBar() error:', e);
-      if (DEBUG) addDebugLog(`??triggerShowBar ?먮윭: ${e.message}`, 'error');
+      if (DEBUG) addDebugLog(`❌ triggerShowBar 에러: ${e.message}`, 'error');
       hide();
     } finally {
-      // ?ㅼ쓬 ?대깽??猷⑦봽?먯꽌 ?뚮옒洹??댁젣
+      // 다음 이벤트 루프에서 플래그 해제
       setTimeout(() => {
         isProcessing = false;
       }, 0);
     }
   }
 
-  // document ?덈꺼?먯꽌 mouseup 泥섎━ (???볦? 踰붿쐞 而ㅻ쾭)
+  // document 레벨에서 mouseup 처리 (더 넓은 범위 커버)
   d.addEventListener('mouseup', (e) => {
     const DEBUG = window.__DEBUG_FLOATING_TOOLBAR || false;
     if (DEBUG) {
-      addDebugLog(`?뼮截?mouseup ?대깽??(target: ${e.target.tagName}.${e.target.className})`, 'info');
+      addDebugLog(`🖱️ mouseup 이벤트 (target: ${e.target.tagName}.${e.target.className})`, 'info');
     }
-    // 湲곗〈 timeout 痍⑥냼
+    // 기존 timeout 취소
     if (mouseupTimeout) clearTimeout(mouseupTimeout);
-    // 吏㏃? 吏?곗쑝濡??좏깮???꾩쟾???꾨즺????泥섎━
-    // selectionFilter?먯꽌 ?꾪꽣留곹븯誘濡??ш린?쒕뒗 紐⑤뱺 mouseup 泥섎━
+    // 짧은 지연으로 선택이 완전히 완료된 후 처리
+    // selectionFilter에서 필터링하므로 여기서는 모든 mouseup 처리
     mouseupTimeout = setTimeout(() => {
-      if (DEBUG) addDebugLog('??mouseup timeout ?ㅽ뻾', 'info');
+      if (DEBUG) addDebugLog('⏰ mouseup timeout 실행', 'info');
       triggerShowBar();
       mouseupTimeout = null;
     }, 50);
@@ -5351,30 +5176,30 @@ function createFloatingToolbar(options) {
     });
   }
 
-  // ?꾩뿭 ?대깽??(selectionchange??window蹂꾨줈)
+  // 전역 이벤트 (selectionchange는 window별로)
   w.addEventListener('selectionchange', () => {
     const DEBUG = window.__DEBUG_FLOATING_TOOLBAR || false;
     if (DEBUG) {
       const sel = w.getSelection();
-      addDebugLog(`?뱷 selectionchange ?대깽??(rangeCount: ${sel?.rangeCount || 0}, collapsed: ${sel?.isCollapsed || true})`, 'info');
+      addDebugLog(`📝 selectionchange 이벤트 (rangeCount: ${sel?.rangeCount || 0}, collapsed: ${sel?.isCollapsed || true})`, 'info');
     }
-    // mouseup 泥섎━ 以묒씠硫?臾댁떆
+    // mouseup 처리 중이면 무시
     if (mouseupTimeout) {
-      if (DEBUG) addDebugLog('?좑툘 selectionchange: mouseup 泥섎━ 以? 臾댁떆', 'warn');
+      if (DEBUG) addDebugLog('⚠️ selectionchange: mouseup 처리 중, 무시', 'warn');
       return;
     }
-    // 泥섎━ 以묒씠硫?臾댁떆 (臾댄븳 猷⑦봽 諛⑹?)
+    // 처리 중이면 무시 (무한 루프 방지)
     if (isProcessing) {
-      if (DEBUG) addDebugLog('?좑툘 selectionchange: 泥섎━ 以? 臾댁떆', 'warn');
+      if (DEBUG) addDebugLog('⚠️ selectionchange: 처리 중, 무시', 'warn');
       return;
     }
-    // 吏㏃? 吏?곗쑝濡?以묐났 諛⑹? (50ms?먯꽌 100ms濡?利앷?)
+    // 짧은 지연으로 중복 방지 (50ms에서 100ms로 증가)
     if (Date.now() - lastSelectionTime < 100) {
-      if (DEBUG) addDebugLog('?좑툘 selectionchange: 以묐났 諛⑹?', 'warn');
+      if (DEBUG) addDebugLog('⚠️ selectionchange: 중복 방지', 'warn');
       return;
     }
     setTimeout(() => {
-      if (DEBUG) addDebugLog('??selectionchange timeout ?ㅽ뻾', 'info');
+      if (DEBUG) addDebugLog('⏰ selectionchange timeout 실행', 'info');
       triggerShowBar();
     }, 100);
   });
@@ -5382,16 +5207,16 @@ function createFloatingToolbar(options) {
   w.addEventListener('scroll', hide, { passive: true });
   w.addEventListener('resize', hide);
 
-  // ?ㅻ낫???⑥텞??(?몄뀡 ?ㅽ??? Ctrl+B/I/U/K, Ctrl+Shift+H: 湲?먯깋)
+  // 키보드 단축키 (노션 스타일: Ctrl+B/I/U/K, Ctrl+Shift+H: 글자색)
   w.addEventListener('keydown', (e) => {
     if (selectionFilter && !selectionFilter()) return;
     
-    // Ctrl+Shift+H: 湲?먯깋 ?좏깮
+    // Ctrl+Shift+H: 글자색 선택
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'h') {
       e.preventDefault();
       const sel = w.getSelection();
       if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-        // HTML5 color input ?ъ슜
+        // HTML5 color input 사용
         const colorInput = d.createElement('input');
         colorInput.type = 'color';
         colorInput.value = '#000000';
@@ -5425,10 +5250,10 @@ function createFloatingToolbar(options) {
       e.preventDefault();
       const execCmd = commandHandler || ((cmd, val) => d.execCommand(cmd, false, val));
       if (k === 'k') {
-        // 留곹겕: ?좏깮???띿뒪?멸? ?덉쑝硫?留곹겕 異붽?, ?놁쑝硫??꾨＼?꾪듃
+        // 링크: 선택된 텍스트가 있으면 링크 추가, 없으면 프롬프트
         const sel = w.getSelection();
         if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-          const url = w.prompt('留곹겕 URL???낅젰?섏꽭??', 'https://');
+          const url = w.prompt('링크 URL을 입력하세요:', 'https://');
           if (url) {
             execCmd('createLink', false, url);
           }
@@ -5443,7 +5268,7 @@ function createFloatingToolbar(options) {
   return { showBar, hide, saveSel, restoreSel };
 }
 
-/* === ?덈Ц???꾩슜 ?쒖떇 ?대컮 === */
+/* === 절문장 전용 서식 툴바 === */
 (function(){
   const bar = document.getElementById('vbar') || document.getElementById('wbp-plbar');
   const color = document.getElementById('vcolor');
@@ -5452,22 +5277,22 @@ function createFloatingToolbar(options) {
   // ===== [INIT HOOK] BEGIN =====
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      safeBindFmtButtons(); // ?쒖떇??? ?쒖떇?붾났, ?쒖떇?대낫?닿린, ?쒖떇媛?몄삤湲?踰꾪듉
-      ensureBookHeadChips();       // ?몚 媛??깃꼍梨?1??泥ル떒???ㅺ탳踰꾪듉 ?ㅻⅨ履쎌뿉 湲곕낯?댄빐, ?댁슜援ъ“, 硫붿꽭吏?붿빟 
-      ensureGlobalBookChips();     // ?몚 ?ㅻ뜑??'?쒖떇媛?몄삤湲? ?ㅻⅨ履쎌뿉 ?꾩뿭 移⑹뒪
-      // 踰꾪듉 ?됱긽 ?낅뜲?댄듃 (珥덇린????
+      safeBindFmtButtons(); // 서식저장, 서식화복, 서식내보내기, 서식가져오기 버튼
+      ensureBookHeadChips();       // 👈 각 성경책 1장 첫단락 설교버튼 오른쪽에 기본이해, 내용구조, 메세지요약 
+      ensureGlobalBookChips();     // 👈 헤더의 '서식가져오기' 오른쪽에 전역 칩스
+      // 버튼 색상 업데이트 (초기화 후)
       setTimeout(updateButtonColors, 500);
     });
   } else {
     safeBindFmtButtons();
-    ensureBookHeadChips();       // ?몚 留덉?留됱뿉 ?몄텧 (?뺤갑)
-    ensureGlobalBookChips();     // ?몚 ?ㅻ뜑??'?쒖떇媛?몄삤湲? ?ㅻⅨ履쎌뿉 ?꾩뿭 移⑹뒪
-    // 踰꾪듉 ?됱긽 ?낅뜲?댄듃 (珥덇린????
+    ensureBookHeadChips();       // 👈 마지막에 호출 (정착)
+    ensureGlobalBookChips();     // 👈 헤더의 '서식가져오기' 오른쪽에 전역 칩스
+    // 버튼 색상 업데이트 (초기화 후)
     setTimeout(updateButtonColors, 500);
   }
   document.addEventListener('wbp:treeBuilt', ()=>{
     const root = document.getElementById('tree') || document;
-    WBP_FMT.restoreAll(root);       // (湲곗〈 ?좎?)
+    WBP_FMT.restoreAll(root);       // (기존 유지)
     document.addEventListener('wbp:treeBuilt', ensureBookHeadChips);
   });
   // ===== [INIT HOOK] END =====
@@ -5475,7 +5300,7 @@ function createFloatingToolbar(options) {
   const treeEl = document.getElementById('tree');
   if(!bar || !treeEl) return;
 
-  // ?뵇 ?붾쾭源??⑤꼸 ?앹꽦 (?꾩뿭 ?ㅼ퐫??
+  // 🔍 디버깅 패널 생성 (전역 스코프)
   if (!window.__WBP_DEBUG_PANEL) {
     function createDebugPanel() {
       if (document.getElementById('wbp-debug-panel')) return document.getElementById('wbp-debug-panel');
@@ -5490,8 +5315,8 @@ function createFloatingToolbar(options) {
       `;
       panel.innerHTML = `
         <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #0f0; padding-bottom:4px;">
-          <strong style="color:#0f0;">?뵇 ?뚮줈???대컮 ?붾쾭洹?/strong>
-          <button id="wbp-debug-close" style="background:#0f0; color:#000; border:none; padding:2px 8px; cursor:pointer; border-radius:4px;">??/button>
+          <strong style="color:#0f0;">🔍 플로팅 툴바 디버그</strong>
+          <button id="wbp-debug-close" style="background:#0f0; color:#000; border:none; padding:2px 8px; cursor:pointer; border-radius:4px;">✕</button>
         </div>
         <div id="wbp-debug-content" style="line-height:1.6;"></div>
       `;
@@ -5505,7 +5330,7 @@ function createFloatingToolbar(options) {
     createDebugPanel();
   }
   
-  // ?꾩뿭 ?붾쾭洹?濡쒓렇 ?⑥닔
+  // 전역 디버그 로그 함수
   window.__addDebugLog = function(message, type = 'info') {
     const DEBUG = window.__DEBUG_FLOATING_TOOLBAR || false;
     if (DEBUG) {
@@ -5519,41 +5344,41 @@ function createFloatingToolbar(options) {
       logEntry.textContent = `[${time}] ${message}`;
       debugContent.appendChild(logEntry);
       debugContent.scrollTop = debugContent.scrollHeight;
-      // 理쒕? 50媛?濡쒓렇留??좎?
+      // 최대 50개 로그만 유지
       while (debugContent.children.length > 50) {
         debugContent.removeChild(debugContent.firstChild);
       }
     }
   };
   
-  // 濡쒖뺄 蹂꾩묶
+  // 로컬 별칭
   const addDebugLog = window.__addDebugLog;
   
-  // ?붾쾭洹??⑤꼸 ?쒖떆/?④? ?좉?
+  // 디버그 패널 표시/숨김 토글
   window.__toggleDebugPanel = () => {
     const debugPanel = document.getElementById('wbp-debug-panel');
     if (!debugPanel) return;
     if (debugPanel.style.display === 'none' || !debugPanel.style.display) {
       debugPanel.style.display = 'block';
       window.__DEBUG_FLOATING_TOOLBAR = true;
-      addDebugLog('?붾쾭洹?紐⑤뱶 ?쒖꽦??, 'success');
+      addDebugLog('디버그 모드 활성화', 'success');
     } else {
       debugPanel.style.display = 'none';
     }
   };
 
-  // selectionFilter: 蹂몃Ц ?덈Ц?λ쭔 ?덉슜
+  // selectionFilter: 본문 절문장만 허용
   function inVerse() {
-    const DEBUG = window.__DEBUG_FLOATING_TOOLBAR || false; // ?붾쾭源??뚮옒洹?
+    const DEBUG = window.__DEBUG_FLOATING_TOOLBAR || false; // 디버깅 플래그
     const startTime = performance.now();
     
     try {
-      // ?뵻 0) ?꾩옱 window媛 硫붿씤 window?몄? ?뺤씤 (?ㅺ탳 ?앹뾽 window ?쒖쇅)
-      // ?ㅺ탳 ?앹뾽? 蹂꾨룄 window?대?濡????⑥닔??硫붿씤 window?먯꽌留??ㅽ뻾??
+      // 🔹 0) 현재 window가 메인 window인지 확인 (설교 팝업 window 제외)
+      // 설교 팝업은 별도 window이므로 이 함수는 메인 window에서만 실행됨
       if (window !== window.top || window.parent !== window) {
         if (DEBUG) {
-          console.log('[inVerse] ?앹뾽 window ?쒖쇅');
-          addDebugLog('???앹뾽 window ?쒖쇅', 'warn');
+          console.log('[inVerse] 팝업 window 제외');
+          addDebugLog('❌ 팝업 window 제외', 'warn');
         }
         return false;
       }
@@ -5561,80 +5386,80 @@ function createFloatingToolbar(options) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) {
       if (DEBUG) {
-        console.log('[inVerse] ?좏깮 ?놁쓬');
-        addDebugLog('???좏깮 ?놁쓬', 'warn');
+        console.log('[inVerse] 선택 없음');
+        addDebugLog('❌ 선택 없음', 'warn');
       }
       return false;
     }
     
     if (DEBUG) {
-      addDebugLog(`???좏깮 ?덉쓬 (rangeCount: ${sel.rangeCount}, collapsed: ${sel.isCollapsed})`, 'info');
+      addDebugLog(`✓ 선택 있음 (rangeCount: ${sel.rangeCount}, collapsed: ${sel.isCollapsed})`, 'info');
     }
-    // isCollapsed 泥댄겕??showBar()?먯꽌 ?대? 泥섎━?섎?濡??ш린?쒕뒗 ?쒓굅
+    // isCollapsed 체크는 showBar()에서 이미 처리되므로 여기서는 제거
 
-    // ?뵻 4) ?ㅼ쭅 ?깃꼍 蹂몃Ц(#tree ??.verse ?먮뒗 .pline)???뚮쭔 true
+    // 🔹 4) 오직 성경 본문(#tree 안 .verse 또는 .pline)일 때만 true
     const treeEl = document.getElementById('tree');
     if (!treeEl) {
       if (DEBUG) {
-        console.log('[inVerse] treeEl ?놁쓬');
-        addDebugLog('??#tree ?붿냼 ?놁쓬', 'error');
+        console.log('[inVerse] treeEl 없음');
+        addDebugLog('❌ #tree 요소 없음', 'error');
       }
       return false;
     }
     
     if (DEBUG) {
-      addDebugLog(`??#tree ?붿냼 李얠쓬`, 'info');
+      addDebugLog(`✓ #tree 요소 찾음`, 'info');
     }
     
     let range;
     try {
       range = sel.getRangeAt(0);
     } catch (e) {
-      if (DEBUG) console.log('[inVerse] range ?묎렐 ?ㅽ뙣:', e);
-      return false; // range ?묎렐 ?ㅽ뙣
+      if (DEBUG) console.log('[inVerse] range 접근 실패:', e);
+      return false; // range 접근 실패
     }
     
     const c  = range.commonAncestorContainer;
     const el = (c.nodeType === 1 ? c : c.parentElement);
     if (!el) {
-      if (DEBUG) console.log('[inVerse] el ?놁쓬');
+      if (DEBUG) console.log('[inVerse] el 없음');
       return false;
     }
 
-    // ?뵻 0-1) 紐⑤떖 泥댄겕???섏쨷???섑뻾 (癒쇱? .pcontent/.pline ?뺤씤)
+    // 🔹 0-1) 모달 체크는 나중에 수행 (먼저 .pcontent/.pline 확인)
 
-    // ?뵻 1) ?좏깮???붿냼媛 硫붿씤 document???랁븯?붿? ?뺤씤 (?ㅺ탳 ?앹뾽 ?쒖쇅)
+    // 🔹 1) 선택된 요소가 메인 document에 속하는지 확인 (설교 팝업 제외)
     try {
       if (el.ownerDocument !== document) {
-        if (DEBUG) console.log('[inVerse] ?ㅻⅨ window??document ?쒖쇅');
-        return false; // ?ㅻⅨ window??document硫??쒖쇅
+        if (DEBUG) console.log('[inVerse] 다른 window의 document 제외');
+        return false; // 다른 window의 document면 제외
       }
     } catch (e) {
-      if (DEBUG) console.log('[inVerse] document ?묎렐 遺덇?:', e);
-      return false; // ?묎렐 遺덇??ν븯硫??쒖쇅
+      if (DEBUG) console.log('[inVerse] document 접근 불가:', e);
+      return false; // 접근 불가능하면 제외
     }
 
-    // ?뵻 4) ?좏깮 ?곸뿭???쒖옉怨???而⑦뀒?대꼫瑜?癒쇱? ?뺤씤 (commonAncestorContainer蹂대떎 ?뺥솗)
+    // 🔹 4) 선택 영역의 시작과 끝 컨테이너를 먼저 확인 (commonAncestorContainer보다 정확)
     const startContainer = range.startContainer;
     const endContainer = range.endContainer;
     
-    // ?쒖옉/??而⑦뀒?대꼫媛 .pcontent ?먮뒗 .pline ?대????덈뒗吏 ?뺤씤?섎뒗 ?ы띁 ?⑥닔
+    // 시작/끝 컨테이너가 .pcontent 또는 .pline 내부에 있는지 확인하는 헬퍼 함수
     function isInPcontent(container) {
       if (!container) return false;
       
       let node = container;
-      if (container.nodeType === 3) { // ?띿뒪???몃뱶
+      if (container.nodeType === 3) { // 텍스트 노드
         node = container.parentElement;
       }
       if (!node) return false;
       
-      // .pcontent ?먮뒗 .pline 李얘린
+      // .pcontent 또는 .pline 찾기
       const pcontent = node.closest('.pcontent');
       const pline = node.closest('.pline');
       const verse = node.closest('.verse');
       const verseLine = node.closest('.verse-line');
       
-      // .pcontent??.pline??#tree ?덉뿉 ?덉쑝硫?true
+      // .pcontent나 .pline이 #tree 안에 있으면 true
       if (pcontent && treeEl.contains(pcontent)) return true;
       if (pline && treeEl.contains(pline)) return true;
       if (verse && treeEl.contains(verse)) return true;
@@ -5643,7 +5468,7 @@ function createFloatingToolbar(options) {
       return false;
     }
     
-    // ?쒖옉 ?먮뒗 ?앹씠 .pcontent/.pline ?대????덉쑝硫??덉슜
+    // 시작 또는 끝이 .pcontent/.pline 내부에 있으면 허용
     const startInPcontent = isInPcontent(startContainer);
     const endInPcontent = isInPcontent(endContainer);
     if (startInPcontent || endInPcontent) {
@@ -5654,30 +5479,30 @@ function createFloatingToolbar(options) {
           startContainer: startContainer.nodeType === 3 ? startContainer.textContent?.substring(0, 20) : startContainer.tagName,
           endContainer: endContainer.nodeType === 3 ? endContainer.textContent?.substring(0, 20) : endContainer.tagName
         };
-        console.log('[inVerse] ??.pcontent/.pline ?대? ?좏깮 ?덉슜', info);
-        addDebugLog(`??.pcontent/.pline ?대? ?좏깮 ?덉슜 (start: ${startInPcontent}, end: ${endInPcontent})`, 'success');
+        console.log('[inVerse] ✅ .pcontent/.pline 내부 선택 허용', info);
+        addDebugLog(`✅ .pcontent/.pline 내부 선택 허용 (start: ${startInPcontent}, end: ${endInPcontent})`, 'success');
       }
       const elapsed = (performance.now() - startTime).toFixed(2);
-      if (DEBUG) addDebugLog(`?깍툘 泥섎━ ?쒓컙: ${elapsed}ms`, 'info');
+      if (DEBUG) addDebugLog(`⏱️ 처리 시간: ${elapsed}ms`, 'info');
       return true;
     }
     
     if (DEBUG) {
-      addDebugLog(`?좑툘 .pcontent/.pline ?대? ?좏깮 ?꾨떂 (start: ${startInPcontent}, end: ${endInPcontent})`, 'warn');
+      addDebugLog(`⚠️ .pcontent/.pline 내부 선택 아님 (start: ${startInPcontent}, end: ${endInPcontent})`, 'warn');
     }
     
-    // ?뵻 5) commonAncestorContainer瑜??듯븳 異붽? ?뺤씤
+    // 🔹 5) commonAncestorContainer를 통한 추가 확인
     const pline = el.closest('.pline');
     const verse = el.closest('.verse');
     const verseLine = el.closest('.verse-line');
     const pcontent = el.closest('.pcontent');
     
-    // ?뵻 5-1) #sermonEditor ?대? ?좏깮 泥섎━ (湲곕낯?댄빐 ?몄쭛湲곗뿉?쒕뒗 ?덉슜)
+    // 🔹 5-1) #sermonEditor 내부 선택 처리 (기본이해 편집기에서는 허용)
     const sermonEditor = el.closest('#sermonEditor');
     if (sermonEditor) {
       const sermonBody = sermonEditor.querySelector('#sermonBody');
       if (sermonBody) {
-        // ?좏깮 ?곸뿭???쒖옉?대굹 ?앹씠 sermonBody ?대????덈뒗吏 ?뺤씤
+        // 선택 영역의 시작이나 끝이 sermonBody 내부에 있는지 확인
         const startNode = startContainer.nodeType === 3 ? startContainer.parentElement : startContainer;
         const endNode = endContainer.nodeType === 3 ? endContainer.parentElement : endContainer;
         const startInSermonBody = sermonBody.contains(startNode);
@@ -5685,27 +5510,27 @@ function createFloatingToolbar(options) {
         const elInSermonBody = sermonBody.contains(el) || el === sermonBody;
         
         if (startInSermonBody || endInSermonBody || elInSermonBody) {
-          // 紐⑤뱺 ?몄쭛湲?紐⑤뱶?먯꽌 ?뚮줈???대컮 ?덉슜
-          // - 梨??⑥쐞: book-basic, book-struct, book-summary
-          // - ?⑤씫 ?⑥쐞: summary, unit, whole, commentary
+          // 모든 편집기 모드에서 플로팅 툴바 허용
+          // - 책 단위: book-basic, book-struct, book-summary
+          // - 단락 단위: summary, unit, whole, commentary
           const ctxType = sermonEditor.dataset.ctxType;
           if (ctxType) {
-            // 梨??⑥쐞 ?몄쭛湲??먮뒗 ?⑤씫 ?⑥쐞 ?몄쭛湲?紐⑤몢 ?덉슜
+            // 책 단위 편집기 또는 단락 단위 편집기 모두 허용
             const allowedTypes = ['summary', 'unit', 'whole', 'commentary'];
             if (ctxType.startsWith('book-') || allowedTypes.includes(ctxType)) {
               if (DEBUG) {
-                console.log('[inVerse] ??#sermonBody ?좏깮 ?덉슜 (?몄쭛湲?', {
+                console.log('[inVerse] ✅ #sermonBody 선택 허용 (편집기)', {
                   startInSermonBody,
                   endInSermonBody,
                   elInSermonBody,
                   ctxType
                 });
               }
-              return true; // ?몄쭛湲곗뿉?쒕뒗 ?덉슜
+              return true; // 편집기에서는 허용
             }
           }
           if (DEBUG) {
-            console.log('[inVerse] ??#sermonBody ?좏깮 ?쒖쇅', {
+            console.log('[inVerse] ❌ #sermonBody 선택 제외', {
               startInSermonBody,
               endInSermonBody,
               elInSermonBody,
@@ -5715,21 +5540,21 @@ function createFloatingToolbar(options) {
               elClass: el.className
             });
           }
-          return false; // ?ㅻⅨ 紐⑤뱶?먯꽌???쒖쇅
+          return false; // 다른 모드에서는 제외
         }
       }
     }
     
-    // ?뵻 5-2) #tree ?덉뿉 ?덈뒗吏 ?뺤씤 (?깃꼍 蹂몃Ц ?곸뿭留??덉슜)
+    // 🔹 5-2) #tree 안에 있는지 확인 (성경 본문 영역만 허용)
     const isInTree = treeEl.contains(el);
     if (DEBUG) {
-      addDebugLog(`?뱧 #tree ?대? ?щ?: ${isInTree}`, 'info');
+      addDebugLog(`📍 #tree 내부 여부: ${isInTree}`, 'info');
       addDebugLog(`  - el.tagName: ${el.tagName}, el.className: ${el.className}`, 'info');
       addDebugLog(`  - pcontent: ${!!pcontent}, pline: ${!!pline}, verse: ${!!verse}, verseLine: ${!!verseLine}`, 'info');
     }
     
     if (isInTree) {
-      // .pcontent ?대??먯꽌 ?좏깮??寃쎌슦???덉슜 (?щ윭 .pline??嫄몄튇 ?좏깮 ?ы븿)
+      // .pcontent 내부에서 선택된 경우도 허용 (여러 .pline에 걸친 선택 포함)
       if (pcontent || pline || verse || verseLine) {
         if (DEBUG) {
           const info = {
@@ -5740,35 +5565,35 @@ function createFloatingToolbar(options) {
             elTag: el.tagName,
             elClass: el.className
           };
-          console.log('[inVerse] ??#tree ?대? .pcontent/.pline ?좏깮 ?덉슜', info);
-          addDebugLog(`??#tree ?대? .pcontent/.pline ?좏깮 ?덉슜`, 'success');
+          console.log('[inVerse] ✅ #tree 내부 .pcontent/.pline 선택 허용', info);
+          addDebugLog(`✅ #tree 내부 .pcontent/.pline 선택 허용`, 'success');
           addDebugLog(`  - pcontent: ${!!pcontent}, pline: ${!!pline}`, 'info');
         }
         const elapsed = (performance.now() - startTime).toFixed(2);
-        if (DEBUG) addDebugLog(`?깍툘 泥섎━ ?쒓컙: ${elapsed}ms`, 'info');
+        if (DEBUG) addDebugLog(`⏱️ 처리 시간: ${elapsed}ms`, 'info');
         return true;
       } else {
         if (DEBUG) {
-          addDebugLog(`??#tree ?대?吏留?.pcontent/.pline ?놁쓬`, 'error');
+          addDebugLog(`❌ #tree 내부지만 .pcontent/.pline 없음`, 'error');
         }
       }
     }
     
-    // ?뵻 7) #tree 諛뽰씠硫댁꽌 ??議곌굔???대떦?섏? ?딆쑝硫?false
+    // 🔹 7) #tree 밖이면서 위 조건에 해당하지 않으면 false
     if (!isInTree) {
-      // 紐⑤떖 ?대? ?붿냼 泥댄겕 (?대? ?꾩뿉???덉슜??寃쎌슦???쒖쇅)
-      // ?? ?깃꼍 蹂몃Ц ?곸뿭(#tree ?대?)? ?대? ?꾩뿉??泥섎━?섏뿀?쇰?濡??ш린?쒕뒗 紐⑤떖 ?몄쭛湲곕쭔 泥댄겕
+      // 모달 내부 요소 체크 (이미 위에서 허용된 경우는 제외)
+      // 단, 성경 본문 영역(#tree 내부)은 이미 위에서 처리되었으므로 여기서는 모달 편집기만 체크
       const isInModal = el.closest('#modalWrap') || el.closest('.modal') || el.closest('#sermonList') || 
           el.closest('#rteToolbar') ||
           el.closest('.modal-backdrop') || el.closest('.editor-bar') || 
           (el.closest('.editor') && !treeEl.contains(el)) || el.closest('#modalFooterNew') ||
           el.closest('#editorRoot') || el.closest('#neFloatingBar') ||
-          // .rte??紐⑤떖 ?대???#sermonBody留?泥댄겕 (?깃꼍 蹂몃Ц??.pcontent???쒖쇅)
+          // .rte는 모달 내부의 #sermonBody만 체크 (성경 본문의 .pcontent는 제외)
           (el.closest('.rte') && el.closest('#sermonBody') && !treeEl.contains(el));
       
       if (isInModal) {
         if (DEBUG) {
-          console.log('[inVerse] ??紐⑤떖 ?대? ?붿냼 ?쒖쇅', {
+          console.log('[inVerse] ❌ 모달 내부 요소 제외', {
             elTag: el.tagName,
             elId: el.id,
             elClass: el.className,
@@ -5782,14 +5607,14 @@ function createFloatingToolbar(options) {
         return false;
       }
       if (DEBUG) {
-        console.log('[inVerse] ??#tree 諛뽰씠硫댁꽌 紐⑤떖???꾨떂');
+        console.log('[inVerse] ❌ #tree 밖이면서 모달도 아님');
       }
       return false;
     }
     
-    // ?뵻 8) 紐⑤떖???대젮?덇퀬 ?좏깮??紐⑤떖 ?대????덉쑝硫?false (?? ?꾩뿉???덉슜??#tree ?대? ?좏깮? ?쒖쇅)
-    // ?대? ?꾩뿉??.pcontent, .pline, #sermonBody ?대? ?좏깮? ?덉슜?섏뿀?쇰?濡?
-    // ?ш린?쒕뒗 異붽?濡?泥댄겕???꾩슂媛 ?놁뒿?덈떎.
+    // 🔹 8) 모달이 열려있고 선택이 모달 내부에 있으면 false (단, 위에서 허용된 #tree 내부 선택은 제외)
+    // 이미 위에서 .pcontent, .pline, #sermonBody 내부 선택은 허용되었으므로
+    // 여기서는 추가로 체크할 필요가 없습니다.
     
     if (DEBUG) {
       const info = {
@@ -5800,22 +5625,22 @@ function createFloatingToolbar(options) {
         hasPcontent: !!pcontent,
         hasPline: !!pline
       };
-      console.log('[inVerse] ??紐⑤뱺 議곌굔 遺덈쭔議? false 諛섑솚', info);
-      addDebugLog(`??紐⑤뱺 議곌굔 遺덈쭔議?, 'error');
+      console.log('[inVerse] ❌ 모든 조건 불만족, false 반환', info);
+      addDebugLog(`❌ 모든 조건 불만족`, 'error');
       addDebugLog(`  - isInTree: ${isInTree}, hasPcontent: ${!!pcontent}, hasPline: ${!!pline}`, 'error');
       addDebugLog(`  - el: ${el.tagName}.${el.className}`, 'error');
     }
     const elapsed = (performance.now() - startTime).toFixed(2);
-    if (DEBUG) addDebugLog(`?깍툘 泥섎━ ?쒓컙: ${elapsed}ms`, 'info');
+    if (DEBUG) addDebugLog(`⏱️ 처리 시간: ${elapsed}ms`, 'info');
     return false;
     } catch (e) {
-      // ?덉쇅 諛쒖깮 ??false 諛섑솚 (臾댄븳 猷⑦봽 諛⑹?)
+      // 예외 발생 시 false 반환 (무한 루프 방지)
       console.warn('inVerse() error:', e);
       return false;
     }
   }
 
-  // 怨듯넻 紐⑤뱢 ?ъ슜
+  // 공통 모듈 사용
   const toolbar = createFloatingToolbar({
     barElement: bar,
     colorElement: color,
@@ -5824,22 +5649,22 @@ function createFloatingToolbar(options) {
     commandHandler: (cmd, val) => document.execCommand(cmd, false, val)
   });
 
-  // 紐⑤떖???대┫ ???대컮 媛뺤젣 ?④? (?? ?몄쭛湲??대? ?좏깮? ?덉슜)
+  // 모달이 열릴 때 툴바 강제 숨김 (단, 편집기 내부 선택은 허용)
   const modalWrap = document.getElementById('modalWrap');
   if (modalWrap && toolbar) {
-    // MutationObserver濡?紐⑤떖 ?곹깭 蹂??媛먯?
+    // MutationObserver로 모달 상태 변화 감지
     const observer = new MutationObserver(() => {
       const isModalOpen = modalWrap.style.display === 'flex' || modalWrap.style.display === '';
       const ariaHidden = modalWrap.getAttribute('aria-hidden');
       
-      // 紐⑤떖???대젮?덈뒗 ?곹깭?먯꽌 aria-hidden??true濡??ㅼ젙?섎뒗 寃껋쓣 諛⑹?
+      // 모달이 열려있는 상태에서 aria-hidden이 true로 설정되는 것을 방지
       if (isModalOpen && ariaHidden === 'true') {
         modalWrap.setAttribute('aria-hidden', 'false');
       }
       
-      // 紐⑤떖???대젮?덉뼱???몄쭛湲??대? ?좏깮?대㈃ ?대컮瑜??쒖떆?????덈룄濡?
-      // ?ш린?쒕뒗 ?④린吏 ?딄퀬, selectionFilter?먯꽌 ?덉슜??寃쎌슦?먮쭔 ?쒖떆?섎룄濡???
-      // 紐⑤떖???ロ삍???뚮쭔 媛뺤젣濡??④?
+      // 모달이 열려있어도 편집기 내부 선택이면 툴바를 표시할 수 있도록
+      // 여기서는 숨기지 않고, selectionFilter에서 허용된 경우에만 표시되도록 함
+      // 모달이 닫혔을 때만 강제로 숨김
       if (!isModalOpen && ariaHidden === 'true') {
         toolbar.hide();
       }
@@ -5849,22 +5674,22 @@ function createFloatingToolbar(options) {
       attributeFilter: ['style', 'aria-hidden'] 
     });
     
-    // 紐⑤떖???대┫ ??吏곸젒 ?대컮 ?④? (?대깽??由ъ뒪??
-    // ?? ?깃꼍 蹂몃Ц ?곸뿭 ?좏깮? ?덉슜?섎?濡??ш린?쒕뒗 ?④린吏 ?딆쓬
-    // selectionFilter(inVerse)?먯꽌 ?덉슜??寃쎌슦?먮쭔 ?쒖떆?섎룄濡???
+    // 모달이 열릴 때 직접 툴바 숨김 (이벤트 리스너)
+    // 단, 성경 본문 영역 선택은 허용하므로 여기서는 숨기지 않음
+    // selectionFilter(inVerse)에서 허용된 경우에만 표시되도록 함
     const originalDisplaySetter = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'style')?.set;
     if (modalWrap.style) {
-      // 紐⑤떖 ?닿린 ?⑥닔?ㅼ뿉???몄텧?????덈룄濡??꾩뿭 ?⑥닔濡??깅줉
-      // ?? ?깃꼍 蹂몃Ц ?곸뿭?먯꽌???④린吏 ?딆쓬 (inVerse?먯꽌 ?덉슜)
+      // 모달 열기 함수들에서 호출될 수 있도록 전역 함수로 등록
+      // 단, 성경 본문 영역에서는 숨기지 않음 (inVerse에서 허용)
       window.__hideFloatingToolbar = () => {
         const DEBUG = window.__DEBUG_FLOATING_TOOLBAR || false;
         if (DEBUG) {
-          addDebugLog('?뵒 __hideFloatingToolbar ?몄텧??, 'warn');
+          addDebugLog('🔔 __hideFloatingToolbar 호출됨', 'warn');
         }
-        // ?깃꼍 蹂몃Ц ?곸뿭 ?좏깮???꾨땺 ?뚮쭔 ?④?
+        // 성경 본문 영역 선택이 아닐 때만 숨김
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
-          // inVerse()瑜?吏곸젒 ?몄텧?섏뿬 ?깃꼍 蹂몃Ц ?곸뿭?몄? ?뺤씤
+          // inVerse()를 직접 호출하여 성경 본문 영역인지 확인
           const treeEl = document.getElementById('tree');
           if (treeEl) {
             try {
@@ -5872,53 +5697,53 @@ function createFloatingToolbar(options) {
               const c = range.commonAncestorContainer;
               const el = (c.nodeType === 1 ? c : c.parentElement);
               if (el && treeEl.contains(el)) {
-                // ?깃꼍 蹂몃Ц ?곸뿭?대㈃ ?④린吏 ?딆쓬
+                // 성경 본문 영역이면 숨기지 않음
                 if (DEBUG) {
-                  addDebugLog('???깃꼍 蹂몃Ц ?곸뿭?대?濡??④린吏 ?딆쓬', 'success');
+                  addDebugLog('✅ 성경 본문 영역이므로 숨기지 않음', 'success');
                 }
                 return;
               }
             } catch (e) {
               if (DEBUG) {
-                addDebugLog(`???먮윭 諛쒖깮: ${e.message}`, 'error');
+                addDebugLog(`❌ 에러 발생: ${e.message}`, 'error');
               }
-              // ?먮윭 諛쒖깮 ???④?
+              // 에러 발생 시 숨김
             }
           }
         }
         if (DEBUG) {
-          addDebugLog('?몓截??대컮 ?④? ?ㅽ뻾', 'warn');
+          addDebugLog('👁️ 툴바 숨김 실행', 'warn');
         }
         toolbar.hide();
       };
     }
   }
 
-// ===== [FORMAT-PERSIST QUICK INSPECTOR] ?대┛ ?⑤씫 ??λ낯 諛붾줈 蹂닿린 =====
+// ===== [FORMAT-PERSIST QUICK INSPECTOR] 열린 단락 저장본 바로 보기 =====
 window.inspectCurrentFormat = () => {
   const t = document.querySelector('details.para[open] summary .ptitle');
-  if(!t){ console.warn('?좑툘 ?대젮?덈뒗 ?⑤씫???놁뒿?덈떎. 癒쇱? ?⑤씫???ъ꽭??'); return; }
+  if(!t){ console.warn('⚠️ 열려있는 단락이 없습니다. 먼저 단락을 여세요.'); return; }
 
   const key = `WBP3_FMT:${t.dataset.book}:${t.dataset.ch}:${t.dataset.idx}`;
   const d = loadState(key, null);
-  if(!d){ console.warn('????λ맂 ?쒖떇 ?곗씠?곌? ?놁뒿?덈떎.', key); return; }
+  if(!d){ console.warn('❌ 저장된 서식 데이터가 없습니다.', key); return; }
 
   try {
-    console.group('?뱲 ?대┛ ?⑤씫 ?쒖떇????뺤씤');
+    console.group('📘 열린 단락 서식저장 확인');
     console.log('KEY:', key);
-    console.log('踰꾩쟾(v):', d.v);
-    console.log('??μ떆媛?', new Date(d.savedAt).toLocaleString());
-    console.log('?덈Ц????', d.lines?.length || 0);
+    console.log('버전(v):', d.v);
+    console.log('저장시각:', new Date(d.savedAt).toLocaleString());
+    console.log('절문장 수:', d.lines?.length || 0);
 
     if (Array.isArray(d.lines) && d.lines.length) {
       const L = d.lines[0];
-      console.log('??泥??덈Ц??HTML:', (L.html||'').slice(0,120) + '...');
-      console.log('??泥??덈Ц???띿뒪??', (L.text||'').slice(0,100));
-      console.log('??泥??덈Ц??spans(?쒖떇 runs):', L.spans?.slice(0,10) || '(?놁쓬)');
+      console.log('▶ 첫 절문장 HTML:', (L.html||'').slice(0,120) + '...');
+      console.log('▶ 첫 절문장 텍스트:', (L.text||'').slice(0,100));
+      console.log('▶ 첫 절문장 spans(서식 runs):', L.spans?.slice(0,10) || '(없음)');
     }
     console.groupEnd();
   } catch(e) {
-    console.error('?좑툘 ????곗씠???뚯떛 ?ㅻ쪟:', e);
+    console.error('⚠️ 저장 데이터 파싱 오류:', e);
   }
 };
 
@@ -5929,7 +5754,7 @@ window.inspectCurrentFormat = () => {
   document.head.appendChild(css);
 })();
 
-// === [REMOVE HEADER CHIPS] ?ㅻ뜑??'湲곕낯?댄빐쨌?댁슜援ъ“쨌硫붿꽭吏?붿빟' ?쒓굅 ===
+// === [REMOVE HEADER CHIPS] 헤더의 '기본이해·내용구조·메세지요약' 제거 ===
 (function removeHeaderChips(){
   const hdr = document.querySelector('header');
   if (!hdr) return;
@@ -5943,7 +5768,7 @@ window.inspectCurrentFormat = () => {
 
 // === [REMOVE HEADER CHIPS - DELAYED] ===
 function removeHeaderBookEditors(){
-  const labels = ['湲곕낯?댄빐','?댁슜援ъ“','硫붿꽭吏?붿빟'];
+  const labels = ['기본이해','내용구조','메세지요약'];
   const tryRemove = ()=>{
     const header = document.querySelector('header');
     if(!header) return;
@@ -5954,51 +5779,51 @@ function removeHeaderBookEditors(){
         removed++;
       }
     });
-    if(removed>0) console.log('湲곕낯?댄빐쨌?댁슜援ъ“쨌硫붿꽭吏?붿빟 ?쒓굅 ?꾨즺');
-    else setTimeout(tryRemove, 500); // 踰꾪듉 ?앹꽦 吏???鍮?諛섎났 ?쒕룄
+    if(removed>0) console.log('기본이해·내용구조·메세지요약 제거 완료');
+    else setTimeout(tryRemove, 500); // 버튼 생성 지연 대비 반복 시도
   };
   tryRemove();
 }
 removeHeaderBookEditors();
 
-// === [BOOK-CHIP ??FLOW-EDITOR ?ъ궗??諛붿씤?? ===============================
+// === [BOOK-CHIP → FLOW-EDITOR 재사용 바인딩] ===============================
 function bindBookHeadChipsToFlowEditor(){
   const tree = document.getElementById('tree');
   if(!tree) return;
 
-  // ?щ윭 沅뚯씠 ?숈떆??open?대㈃ 留됯린
+  // 여러 권이 동시에 open이면 막기
   const openedBooks = [...tree.querySelectorAll('details.book[open]')];
   if(openedBooks.length > 1){
-    alert('2媛??댁긽 ?깃꼍???대젮 ?덉뒿?덈떎. ??沅뚮쭔 ???ㅼ쓬 ?ㅼ떆 ?쒕룄?섏꽭??');
+    alert('2개 이상 성경이 열려 있습니다. 한 권만 연 다음 다시 시도하세요.');
     return;
   }
 
-  // ??? ?꾩옱 ?대젮?덈뒗 梨??먮뒗 ?붾㈃??泥?梨?
+  // 대상: 현재 열려있는 책(또는 화면상 첫 책)
   const bookEl =
     openedBooks[0] ||
     tree.querySelector('details.book');
 
   if(!bookEl) return;
 
-  // ??梨낆쓽 1??泥??⑤씫 ?대컮?먯꽌 '?댁슜?먮쫫' 踰꾪듉??李얠븘 ?붾떎
+  // 이 책의 1장/첫 단락 툴바에서 '내용흐름' 버튼을 찾아 둔다
   const ch1 = bookEl.querySelector(':scope > .chapters > details') || bookEl.querySelector('details');
   const p1  = ch1?.querySelector(':scope > .paras > details.para') || ch1?.querySelector('details.para');
   if(!p1) return;
   const flowBtn = p1.querySelector('.ptoolbar [data-action="flow"], .ptoolbar .btn-flow, .ptoolbar .chip-flow');
   if(!flowBtn) return;
 
-  // ?ㅻ뜑 履?3踰꾪듉(?먮뒗 1??泥??⑤씫 ?놁뿉 異붽???3移???李얠븘 ?숈씪???몄쭛湲??몄텧濡??곌껐
+  // 헤더 쪽 3버튼(또는 1장 첫 단락 옆에 추가된 3칩)을 찾아 동일한 편집기 호출로 연결
   const selectors = [
-    '.chip-basic',      // 湲곕낯?댄빐
-    '.chip-structure',  // ?댁슜援ъ“
-    '.chip-summary'     // 硫붿꽭吏?붿빟
+    '.chip-basic',      // 기본이해
+    '.chip-structure',  // 내용구조
+    '.chip-summary'     // 메세지요약
   ];
   const chips = [
     ...document.querySelectorAll(selectors.join(','))
   ];
 
   chips.forEach(chip=>{
-    // 以묐났 諛붿씤??諛⑹?
+    // 중복 바인딩 방지
     if(chip.dataset.wbpBind === 'ok') return;
     chip.dataset.wbpBind = 'ok';
 
@@ -6006,18 +5831,18 @@ function bindBookHeadChipsToFlowEditor(){
       e.preventDefault();
       e.stopPropagation();
 
-      // ?ㅼ떆 ??踰? ?ㅼ쨷 ?ㅽ뵂 諛⑹?
+      // 다시 한 번: 다중 오픈 방지
       const openBooksNow = [...tree.querySelectorAll('details.book[open]')];
       if(openBooksNow.length !== 1){
-        alert('?몄쭛湲곕뒗 ??沅뚮쭔 ?대┛ ?곹깭?먯꽌 ?ъ슜?????덉뒿?덈떎.');
+        alert('편집기는 한 권만 열린 상태에서 사용할 수 있습니다.');
         return;
       }
 
-      // ?댁슜?먮쫫 踰꾪듉???몄쭛湲곕? 洹몃?濡??ъ슜
+      // 내용흐름 버튼의 편집기를 그대로 사용
       flowBtn.click();
 
-      // ?몄쭛湲????? ?쒕ぉ留??대떦 移??띿뒪?몃줈 援먯껜(?숈씪 UI ?좎?)
-      // (?몄쭛湲?DOM ?대옒?ㅻ뒗 ?꾨줈?앺듃??留욎떠 ?꾨옒 ?꾨낫 以?議댁옱?섎뒗 寃껋쑝濡??곸슜)
+      // 편집기 뜬 뒤, 제목만 해당 칩 텍스트로 교체(동일 UI 유지)
+      // (편집기 DOM 클래스는 프로젝트에 맞춰 아래 후보 중 존재하는 것으로 적용)
       requestAnimationFrame(()=>{
         const dlg =
           document.querySelector('.flow-editor-modal')
@@ -6037,35 +5862,35 @@ function bindBookHeadChipsToFlowEditor(){
 }
 // ===========================================================================
 
-// 珥덇린 諛붿씤???몃━ ?뚮뜑 ?댄썑??1??
+// 초기 바인딩(트리 렌더 이후에 1회)
 document.addEventListener('wbp:treeBuilt', ()=>{
   bindBookHeadChipsToFlowEditor();
 });
 
-// 珥덇린 濡쒕뱶 吏곹썑 ??踰??쒕룄(?대? ?뚮뜑?섏뼱 ?덉쑝硫?利됱떆 ?곌껐)
+// 초기 로드 직후 한 번 시도(이미 렌더되어 있으면 즉시 연결)
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bindBookHeadChipsToFlowEditor);
 } else {
   bindBookHeadChipsToFlowEditor();
 }
 
-// === [BOOK-CHIPS ??FLOW EDITOR ?ъ궗?? =====================================
+// === [BOOK-CHIPS → FLOW EDITOR 재사용] =====================================
 function bindBookChipsToFlowEditor(){
   const tree = document.getElementById('tree');
   if(!tree) return;
 
-  // ?꾩옱 ?대┛ 梨????뺤씤 (2沅??댁긽 ?대젮 ?덉쑝硫?以묐떒)
+  // 현재 열린 책 수 확인 (2권 이상 열려 있으면 중단)
   const openedBooks = [...tree.querySelectorAll('details.book[open]')];
   if (openedBooks.length > 1) {
-    alert('2媛??댁긽 ?깃꼍???대젮 ?덉뒿?덈떎. ??沅뚮쭔 ???ㅼ쓬 ?ㅼ떆 ?쒕룄?섏꽭??');
+    alert('2개 이상 성경이 열려 있습니다. 한 권만 연 다음 다시 시도하세요.');
     return;
   }
 
-  // ???梨? ?대젮?덉쑝硫?洹?梨? ?놁쑝硫?泥?梨?
+  // 대상 책: 열려있으면 그 책, 없으면 첫 책
   const bookEl = openedBooks[0] || tree.querySelector('details.book');
   if(!bookEl) return;
 
-  // ??梨낆쓽 1??泥??⑤씫?먯꽌 '?댁슜?먮쫫' 踰꾪듉(?몄쭛湲??몃━嫄???李얠쓬
+  // 이 책의 1장/첫 단락에서 '내용흐름' 버튼(편집기 트리거)을 찾음
   const ch1 = bookEl.querySelector(':scope > .chapters > details') || bookEl.querySelector('details');
   const p1  = ch1?.querySelector(':scope > .paras > details.para') || ch1?.querySelector('details.para');
   if(!p1) return;
@@ -6074,12 +5899,12 @@ function bindBookChipsToFlowEditor(){
     p1.querySelector('.ptoolbar [data-action="flow"]') ||
     p1.querySelector('.ptoolbar .btn-flow') ||
     p1.querySelector('.ptoolbar .chip-flow') ||
-    p1.querySelector('.ptoolbar button:contains("?댁슜?먮쫫")'); // 理쒗썑 蹂댁젙(?꾩슂??
+    p1.querySelector('.ptoolbar button:contains("내용흐름")'); // 최후 보정(필요시)
 
   if(!flowBtn) return;
 
-  // ???移?踰꾪듉): 媛?梨?1??泥??⑤씫 ?섏꽕援먥??ㅻⅨ履쎌뿉 諛곗튂??3媛?
-  // *?꾨줈?앺듃???곕씪 ?대옒?ㅺ? ?ㅻ? ???덉쑝誘濡??꾨옒 ??됲꽣 以?議댁옱?섎뒗 寃껊쭔 留ㅼ묶*
+  // 대상 칩(버튼): 각 책 1장 첫 단락 ‘설교’ 오른쪽에 배치된 3개
+  // *프로젝트에 따라 클래스가 다를 수 있으므로 아래 셀렉터 중 존재하는 것만 매칭*
   const chips = [
     ...document.querySelectorAll(
       '.bookhead-chips .chip-basic, .bookhead-chips .chip-structure, .bookhead-chips .chip-summary,' +
@@ -6090,24 +5915,24 @@ function bindBookChipsToFlowEditor(){
   ];
 
   chips.forEach(chip=>{
-    if(chip.dataset.flowBind === '1') return; // 以묐났 諛붿씤??諛⑹?
+    if(chip.dataset.flowBind === '1') return; // 중복 바인딩 방지
     chip.dataset.flowBind = '1';
 
     chip.addEventListener('click', (e)=>{
       e.preventDefault();
       e.stopPropagation();
 
-      // ?대┃ ?쒖젏?먮룄 ?ㅼ쨷 ?ㅽ뵂 諛⑹? ?뺤씤
+      // 클릭 시점에도 다중 오픈 방지 확인
       const openBooksNow = [...tree.querySelectorAll('details.book[open]')];
       if (openBooksNow.length !== 1 && openedBooks.length !== 1) {
-        alert('?몄쭛湲곕뒗 ??沅뚮쭔 ?대┛ ?곹깭?먯꽌 ?ъ슜?????덉뒿?덈떎.');
+        alert('편집기는 한 권만 열린 상태에서 사용할 수 있습니다.');
         return;
       }
 
-      // ?섎궡?⑺쓲由꾟?踰꾪듉 ?대┃??洹몃?濡??꾩엫 ???숈씪???몄쭛湲??ㅽ????ъ슜
+      // ‘내용흐름’ 버튼 클릭을 그대로 위임 → 동일한 편집기/스타일 사용
       flowBtn.click();
 
-      // ?몄쭛湲??쒕ぉ??移??쇰꺼濡?援먯껜 (UI???댁슜?먮쫫 ?몄쭛湲곕? 洹몃?濡??ъ슜)
+      // 편집기 제목을 칩 라벨로 교체 (UI는 내용흐름 편집기를 그대로 사용)
       requestAnimationFrame(()=>{
         const dlg =
           document.querySelector('.flow-editor-modal') ||
@@ -6129,19 +5954,19 @@ function bindBookChipsToFlowEditor(){
 }
 // ============================================================================
 
-// ?뚮뜑 ?꾨즺 ??1??諛붿씤??
+// 렌더 완료 후 1회 바인딩
 document.addEventListener('wbp:treeBuilt', ()=> {
   bindBookChipsToFlowEditor();
 });
 
-// 珥덇린 濡쒕뱶 ?쒖젏?먮룄 蹂댁젙
+// 초기 로드 시점에도 보정
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bindBookChipsToFlowEditor);
 } else {
   bindBookChipsToFlowEditor();
 }
 
-// 珥덇린/?щ젋?????곌껐(以묐났 ?몄텧 ?덉슜, ?대??먯꽌 ?먯껜 媛??
+// 초기/재렌더 훅 연결(중복 호출 허용, 내부에서 자체 가드)
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bindFlowEditorToBookChips);
 } else {
@@ -6149,29 +5974,29 @@ if (document.readyState === 'loading') {
 }
 document.addEventListener('wbp:treeBuilt', bindFlowEditorToBookChips);
 
-// === [BOOK-CHIPS DIRECT BIND ???댁슜?먮쫫 ?몄쭛湲??숈씪 湲곕뒫] ================
-// === [BOOK-CHIPS DIRECT BIND ??UNIT CONTEXT ?몄쭛湲??ъ슜] ================
-// === [BOOK-CHIPS DIRECT BIND ??UNIT CONTEXT ?몄쭛湲??ъ슜] ================
+// === [BOOK-CHIPS DIRECT BIND → 내용흐름 편집기 동일 기능] ================
+// === [BOOK-CHIPS DIRECT BIND → UNIT CONTEXT 편집기 사용] ================
+// === [BOOK-CHIPS DIRECT BIND → UNIT CONTEXT 편집기 사용] ================
 function rebindBookChipsToFlowEditor(){
   const tree = document.getElementById('tree');
   if(!tree) return;
 
-  // ?대┛ 梨??섎굹留??덉슜
+  // 열린 책 하나만 허용
   const openedBooks = [...tree.querySelectorAll('details.book[open]')];
   if(openedBooks.length > 1){
-    alert('2媛??댁긽 ?깃꼍???대젮 ?덉뒿?덈떎. ??沅뚮쭔 ???ㅼ쓬 ?쒕룄?섏꽭??');
+    alert('2개 이상 성경이 열려 있습니다. 한 권만 연 다음 시도하세요.');
     return;
   }
 
   const bookEl = openedBooks[0] || tree.querySelector('#tree > details.book');
   if(!bookEl) return;
 
-  // 1??泥??⑤씫
+  // 1장 첫 단락
   const ch1 = bookEl.querySelector(':scope > .chapters > details') || bookEl.querySelector('details');
   const p1  = ch1?.querySelector(':scope > .paras > details.para') || ch1?.querySelector('details.para');
   if(!p1) return;
 
-  // 湲곕낯?댄빐쨌?댁슜援ъ“쨌硫붿꽭吏?붿빟 移?(?щ윭 ?뺥깭 ???
+  // 기본이해·내용구조·메세지요약 칩 (여러 형태 대응)
   const chips = [
     ...document.querySelectorAll(
       '.chip-basic, .chip-structure, .chip-summary, ' +
@@ -6181,11 +6006,11 @@ function rebindBookChipsToFlowEditor(){
   if(!chips.length) return;
 
   chips.forEach(chip=>{
-    // 以묐났 諛⑹?
+    // 중복 방지
     if(chip.dataset.flowBound==='1') return;
     chip.dataset.flowBound='1';
 
-    // 紐⑤뱺 湲곗〈 ?대깽???쒓굅 ???덈줈 諛붿씤??
+    // 모든 기존 이벤트 제거 후 새로 바인딩
     const newChip = chip.cloneNode(true);
     chip.parentNode.replaceChild(newChip, chip);
 
@@ -6195,42 +6020,42 @@ function rebindBookChipsToFlowEditor(){
 
       const nowOpen = [...tree.querySelectorAll('details.book[open]')];
       if(nowOpen.length > 1){
-        alert('?몄쭛湲곕뒗 ??沅뚮쭔 ?대┛ ?곹깭?먯꽌 ?ъ슜?????덉뒿?덈떎.');
+        alert('편집기는 한 권만 열린 상태에서 사용할 수 있습니다.');
         return;
       }
 
-      // 1??泥??⑤씫??book / chap / idx ?뺣낫 異붿텧
+      // 1장 첫 단락의 book / chap / idx 정보 추출
       const paraTitle = p1.querySelector('summary .ptitle');
       const book  = paraTitle?.dataset.book || p1.dataset.book;
       const chap  = parseInt(paraTitle?.dataset.ch || p1.dataset.ch, 10) || 1;
       const idx   = parseInt(paraTitle?.dataset.idx || p1.dataset.idx, 10) || 0;
 
-      // 移?醫낅쪟???곕씪 type 寃곗젙
+      // 칩 종류에 따라 type 결정
       let type = 'basic';
       if (newChip.classList.contains('chip-structure') || newChip.dataset.type === 'structure') {
-        type = 'structure';      // ?댁슜援ъ“
+        type = 'structure';      // 내용구조
       } else if (newChip.classList.contains('chip-summary') || newChip.dataset.type === 'summary') {
-        type = 'summary';        // 硫붿꽭吏?붿빟
+        type = 'summary';        // 메세지요약
       } else {
-        type = 'basic';          // 湲곕낯?댄빐
+        type = 'basic';          // 기본이해
       }
 
-      // ?뵻 ?댁젣??FLOW ?몄쭛湲곌? ?꾨땲??UNIT CONTEXT ?몄쭛湲곕? 吏곸젒 ?ъ슜
-      //    ?????踰꾪듉? saveUnitContext()留??몄텧?섍퀬, 李쎌? ?レ? ?딆쓬
+      // 🔹 이제는 FLOW 편집기가 아니라 UNIT CONTEXT 편집기를 직접 사용
+      //    → 저장 버튼은 saveUnitContext()만 호출하고, 창은 닫지 않음
       if (book != null && !Number.isNaN(chap) && !Number.isNaN(idx)) {
         openUnitContextEditor(book, chap, idx, type);
       } else {
-        console.warn('openUnitContextEditor ?몄텧??book/chap/idx ?뺣낫瑜?李얠? 紐삵뻽?듬땲??', {book, chap, idx});
+        console.warn('openUnitContextEditor 호출용 book/chap/idx 정보를 찾지 못했습니다.', {book, chap, idx});
       }
     });
   });
 }
 // ==========================================================================
 
-// ?뚮뜑 ?꾨즺 ??1???곌껐
+// 렌더 완료 후 1회 연결
 document.addEventListener('wbp:treeBuilt', rebindBookChipsToFlowEditor);
 
-// 珥덇린 DOM 濡쒕뱶 ?쒖젏?먮룄 ?ㅽ뻾
+// 초기 DOM 로드 시점에도 실행
 if(document.readyState==='loading'){
   document.addEventListener('DOMContentLoaded', rebindBookChipsToFlowEditor);
 }else{
@@ -6238,13 +6063,13 @@ if(document.readyState==='loading'){
 }
 
 // =======================
-//  UNIT CONTEXT ???猷⑦떞
+//  UNIT CONTEXT 저장 루틴
 // =======================
 
-// 1) ?쒕쾭 ?먮뒗 濡쒖뺄?ㅽ넗由ъ? ????⑥닔
+// 1) 서버 또는 로컬스토리지 저장 함수
 async function saveUnitContext(type, book, chap, paraIdx, text){
   try {
-    // ?뵻 ?쒕쾭 ???(API ?ъ슜 ??
+    // 🔹 서버 저장 (API 사용 시)
     const res = await fetch(AI_ENDPOINT, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -6257,17 +6082,17 @@ async function saveUnitContext(type, book, chap, paraIdx, text){
       })
     });
 
-    // ?뵻 ?ㅽ뙣??濡쒖뺄諛깆뾽
+    // 🔹 실패시 로컬백업
     if (!res.ok){
-      console.warn("API ????ㅽ뙣 ??濡쒖뺄?ㅽ넗由ъ? 諛깆뾽");
+      console.warn("API 저장 실패 → 로컬스토리지 백업");
       const key = `WBP3_UNITCTX:${book}:${chap}:${paraIdx}:${type}`;
       saveState(key, text);
     }
 
-    status("??λ릺?덉뒿?덈떎.");
+    status("저장되었습니다.");
   } catch (err){
     console.error(err);
-    status("????ㅽ뙣(?ㅽ봽?쇱씤) ??濡쒖뺄 諛깆뾽");
+    status("저장 실패(오프라인) → 로컬 백업");
     const key = `WBP3_UNITCTX:${book}:${chap}:${paraIdx}:${type}`;
     saveState(key, text);
   }
@@ -6275,7 +6100,7 @@ async function saveUnitContext(type, book, chap, paraIdx, text){
 
 
 // =======================
-//  ?몄쭛湲????踰꾪듉 ?대깽??
+//  편집기 저장 버튼 이벤트
 // =======================
 document.addEventListener('click', (e)=>{
   if (!e.target.closest) return;
@@ -6293,7 +6118,7 @@ document.addEventListener('click', (e)=>{
   const textarea = host.querySelector('textarea');
 
   if (!textarea){
-    alert("?낅젰李쎌쓣 李얠쓣 ???놁뒿?덈떎.");
+    alert("입력창을 찾을 수 없습니다.");
     return;
   }
 
@@ -6303,23 +6128,23 @@ document.addEventListener('click', (e)=>{
 });
 
 // =======================
-//  UNIT CONTEXT ?몄쭛湲?
-//  (湲곕낯?댄빐 / ?댁슜?먮쫫 / 硫붿꽭吏?붿빟 怨듭슜)
+//  UNIT CONTEXT 편집기
+//  (기본이해 / 내용흐름 / 메세지요약 공용)
 // =======================
 function openUnitContextEditor(book, chap, paraIdx, type){
-  // ?뵻 ???湲곕낯媛?(??肄붾뱶?먯꽌 3媛쒕쭔 ?섍린??寃쎌슦 ?鍮?
+  // 🔹 타입 기본값 (옛 코드에서 3개만 넘기는 경우 대비)
   if (!type) type = 'basic';
 
-  // ?뵻 ??????쒓? ?쇰꺼
+  // 🔹 타입 → 한글 라벨
   const typeLabelMap = {
-    basic: '湲곕낯?댄빐',
-    structure: '?댁슜?먮쫫',
-    flow: '?댁슜?먮쫫',
-    summary: '硫붿꽭吏?붿빟'
+    basic: '기본이해',
+    structure: '내용흐름',
+    flow: '내용흐름',
+    summary: '메세지요약'
   };
   const typeLabel = typeLabelMap[type] || type;
 
-  // ?뵻 ?몄쭛湲?而⑦뀒?대꼫 ?뺣낫 (?놁쑝硫??앹꽦)
+  // 🔹 편집기 컨테이너 확보 (없으면 생성)
   let host = document.getElementById('unitEditor');
   if (!host){
     host = document.createElement('div');
@@ -6328,13 +6153,13 @@ function openUnitContextEditor(book, chap, paraIdx, type){
     document.body.appendChild(host);
   }
 
-  // ?뵻 ?대뼡 ?⑤씫???몄쭛 以묒씤吏 硫뷀? ?뺣낫 湲곕줉
+  // 🔹 어떤 단락을 편집 중인지 메타 정보 기록
   host.dataset.book = book;
   host.dataset.ch   = String(chap);
   host.dataset.idx  = String(paraIdx);
   host.dataset.type = type;
 
-  // ?뵻 ?붾㈃ ?곷떒??蹂댁뿬以??⑤씫 ?쒕ぉ(?좏깮)
+  // 🔹 화면 상단에 보여줄 단락 제목(선택)
   let refLabel = '';
   try {
     const paraSel = `details.para[data-book="${book}"][data-ch="${chap}"][data-idx="${paraIdx}"]`;
@@ -6343,34 +6168,34 @@ function openUnitContextEditor(book, chap, paraIdx, type){
     if (titleEl){
       refLabel = titleEl.textContent.trim();
     } else {
-      refLabel = `${book} ${chap}???⑤씫 ${paraIdx + 1}`;
+      refLabel = `${book} ${chap}장 단락 ${paraIdx + 1}`;
     }
   } catch (e){
-    refLabel = `${book} ${chap}???⑤씫 ${paraIdx + 1}`;
+    refLabel = `${book} ${chap}장 단락 ${paraIdx + 1}`;
   }
 
-  // ?뵻 ?몄쭛湲?HTML ?쒗뵆由?
+  // 🔹 편집기 HTML 템플릿
   host.innerHTML = `
     <div class="uc-wrap">
       <div class="uc-header">
         <div class="uc-title">
           <span class="uc-ref">${refLabel}</span>
-          <span class="uc-type"> 쨌 ${typeLabel} ?몄쭛</span>
+          <span class="uc-type"> · ${typeLabel} 편집</span>
         </div>
-        <button type="button" class="uc-close" data-uc-close>횞</button>
+        <button type="button" class="uc-close" data-uc-close>×</button>
       </div>
       <div class="uc-body">
         <textarea class="uc-input" spellcheck="false"
-          placeholder="${typeLabel} ?댁슜???낅젰?섏꽭??></textarea>
+          placeholder="${typeLabel} 내용을 입력하세요"></textarea>
       </div>
       <div class="uc-footer">
-        <button type="button" class="uc-save" data-uc-save>???/button>
-        <button type="button" class="uc-cancel" data-uc-close>?リ린</button>
+        <button type="button" class="uc-save" data-uc-save>저장</button>
+        <button type="button" class="uc-cancel" data-uc-close>닫기</button>
       </div>
     </div>
   `;
 
-  // ?뵻 濡쒖뺄?ㅽ넗由ъ?????λ맂 ?댁슜 遺덈윭?ㅺ린
+  // 🔹 로컬스토리지에 저장된 내용 불러오기
   const key   = `WBP3_UNITCTX:${book}:${chap}:${paraIdx}:${type}`;
   const saved = loadState(key, '');
   const ta    = host.querySelector('.uc-input');
@@ -6379,7 +6204,7 @@ function openUnitContextEditor(book, chap, paraIdx, type){
     ta.focus();
   }
 
-  // ?뵻 ?リ린 踰꾪듉 泥섎━
+  // 🔹 닫기 버튼 처리
   host.querySelectorAll('[data-uc-close]').forEach(btn=>{
     btn.onclick = () => {
       host.remove();
@@ -6388,4 +6213,3 @@ function openUnitContextEditor(book, chap, paraIdx, type){
 }
 
 })();
-
