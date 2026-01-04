@@ -1010,6 +1010,8 @@ function _ensureFloatingPlbar(){
     <button type="button" data-cmd="italic">I</button>
     <button type="button" data-cmd="underline">U</button>
     <div class="divider"></div>
+    <input type="color" id="wbp-color-picker" title="색상 선택" style="width:34px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,.06);padding:0">
+    <div class="divider"></div>
     <button type="button" id="wbp-save-format">저장</button>
   `;
   document.body.appendChild(bar);
@@ -1027,6 +1029,19 @@ function _ensureFloatingPlbar(){
       catch(e){ console.error('saveFormatForOpenPara error', e); }
     }
   });
+  // 색상 입력 처리 (input 이벤트)
+  const colorInp = bar.querySelector('#wbp-color-picker');
+  if (colorInp){
+    colorInp.addEventListener('input', (ev)=>{
+      const color = ev.target.value;
+      if (!color) return;
+      try{
+        document.execCommand('foreColor', false, color);
+      }catch(e){
+        _wrapSelectionWithColor(color);
+      }
+    });
+  }
 }
 
 function _wrapSelectionWithTag(cmd){
@@ -1043,6 +1058,33 @@ function _wrapSelectionWithTag(cmd){
     sel.addRange(newRange);
   }catch(e){
     console.warn('[wrapSelection] surroundContents failed:', e);
+  }
+}
+
+function _wrapSelectionWithColor(color){
+  const sel = document.getSelection(); if (!sel || sel.rangeCount===0) return;
+  const range = sel.getRangeAt(0);
+  try{
+    const el = document.createElement('span');
+    el.style.color = color;
+    range.surroundContents(el);
+    sel.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(el);
+    sel.addRange(newRange);
+  }catch(e){
+    // fallback: wrap by extracting contents
+    try{
+      const frag = range.cloneContents();
+      const wrapper = document.createElement('span'); wrapper.style.color = color;
+      wrapper.appendChild(frag);
+      range.deleteContents();
+      range.insertNode(wrapper);
+      sel.removeAllRanges();
+      const nr = document.createRange(); nr.selectNodeContents(wrapper); sel.addRange(nr);
+    }catch(err){
+      console.warn('[wrapSelectionColor] failed:', err);
+    }
   }
 }
 
