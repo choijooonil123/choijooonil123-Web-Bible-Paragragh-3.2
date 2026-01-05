@@ -1469,6 +1469,45 @@ function debounceSave(key, value, delay = DEFAULT_SAVE_DELAY) {
   }, { capture: true });
 })();
 
+// ===== 자동 서식·내용 저장 =====
+let _fmtAutosaveTimer = null;
+function scheduleFormatAutosave(){
+  clearTimeout(_fmtAutosaveTimer);
+  _fmtAutosaveTimer = setTimeout(()=>{
+    try{ saveFormatForOpenPara(); }
+    catch(e){ console.warn('자동 서식/내용 저장 실패:', e); }
+  }, 600);
+}
+function bindFormatAutosave(){
+  document.querySelectorAll('.pcontent').forEach(pc=>{
+    if (pc.dataset.fmtAutosaveBound === '1') return;
+    pc.dataset.fmtAutosaveBound = '1';
+    pc.addEventListener('input', scheduleFormatAutosave);
+    pc.addEventListener('blur', scheduleFormatAutosave);
+  });
+}
+document.addEventListener('wbp:treeBuilt', ()=> setTimeout(bindFormatAutosave, 120));
+
+// ===== 시작 시 자동 듣기 =====
+let _autoReadStarted = false;
+function autoStartInlineReading(){
+  if (_autoReadStarted) return;
+  const para = document.querySelector('details.para[open]') || document.querySelector('#tree details.book details.para');
+  if (!para) return;
+  if (!para.hasAttribute('open')) para.open = true;
+  const t = para.querySelector('summary .ptitle');
+  const btn = para.querySelector('.speakBtn');
+  if (!t || !btn) return;
+  const book = t.dataset.book;
+  const chap = parseInt(t.dataset.ch, 10);
+  const idx  = parseInt(t.dataset.idx, 10);
+  if (!book || Number.isNaN(chap) || Number.isNaN(idx)) return;
+  _autoReadStarted = true;
+  CURRENT.book = book; CURRENT.chap = chap; CURRENT.paraIdx = idx;
+  toggleSpeakInline(book, chap, idx, para, btn);
+}
+document.addEventListener('wbp:treeBuilt', ()=> setTimeout(autoStartInlineReading, 400));
+
 // 통합 로딩 함수
 function loadState(key, defaultValue = null, options = {}) {
   try {
@@ -1571,6 +1610,7 @@ let BIBLE = null;
 let CURRENT = { book:null, chap:null, paraIdx:null, paraId:null };
 let READER = { playing:false, q:[], idx:0, synth:window.speechSynthesis||null, scope:null, btn:null, continuous:false };
 let EDITOR_READER = { playing:false, u:null, synth:window.speechSynthesis||null };
+let PRACTICE = { active:false, rec:null, currentLine:null, counts:new WeakMap(), btn:null };
 
 /* --------- Boot --------- */
 (async function boot(){
@@ -1813,8 +1853,9 @@ function buildTree(){
         body.className = 'pbody';
         body.innerHTML = `
           <div class="ptoolbar">
-            <button class="primary speakBtn">낭독</button>
-            <label class="chip"><input type="checkbox" class="keepReading" style="margin-right:6px">계속 낭독</label>
+            <button class="primary speakBtn">듣기</button>
+            <button class="practiceBtn">읽기</button>
+            <label class="chip"><input type="checkbox" class="keepReading" style="margin-right:6px">계속 듣기</label>
             <button class="ctxBtn btnSummary">내용흐름</button>
             <button class="ctxBtn btnUnitCtx">단위성경속 맥락</button>
             <button class="ctxBtn btnWholeCtx">전체성경속 맥락</button>
@@ -1876,6 +1917,10 @@ function buildTree(){
 
         body.querySelector('.speakBtn').addEventListener('click', ()=>{
           toggleSpeakInline(bookName, chap, idx, detPara, body.querySelector('.speakBtn'));
+        });
+        const practiceBtn = body.querySelector('.practiceBtn');
+        practiceBtn?.addEventListener('click', ()=>{
+          togglePracticeFromToolbar(detPara, practiceBtn);
         });
 
         // 컨텍스트 에디터 버튼들
@@ -2188,6 +2233,152 @@ function highlightSentenceInLine(line, sentenceIndex, sentences) {
   }
 }
 
+/* --------- Reading Practice (STT) --------- */
+function normalizePracticeText(text){
+  return String(text||'')
+    .replace(/[\s.,!?"'“”‘’;:·…~\-]/g,'')
+    .toLowerCase();
+}
+function getLinePlainForPractice(lineEl){
+  if(!lineEl) return '';
+  const clone = lineEl.cloneNode(true);
+  clone.querySelectorAll('sup').forEach(n=> n.remove());
+  return normalizePracticeText(clone.textContent || '');
+}
+function getLineFromSelection(){
+  const sel = window.getSelection();
+  if(!sel || !sel.focusNode) return null;
+  const node = sel.focusNode.nodeType === 1 ? sel.focusNode : sel.focusNode.parentElement;
+  return node?.closest?.('.pline') || null;
+}
+function shadePracticeLine(lineEl, count){
+  if(!lineEl) return;
+  const alpha = Math.min(0.18 + count * 0.12, 0.82);
+  lineEl.style.background = `rgba(80, 150, 255, ${alpha.toFixed(2)})`;
+  lineEl.dataset.practiceCount = String(count);
+  lineEl.classList.add('practice-hit');
+}
+function markPracticeCurrent(lineEl){
+  document.querySelectorAll('.practice-current').forEach(el=> el.classList.remove('practice-current'));
+  if(lineEl){
+    lineEl.classList.add('practice-current');
+    lineEl.scrollIntoView({block:'center', behavior:'smooth'});
+  }
+}
+function moveToNextPracticeLine(currentLine){
+  const all = Array.from(document.querySelectorAll('.pline'));
+  const idx = all.indexOf(currentLine);
+  if(idx >= 0 && idx < all.length - 1){
+    const next = all[idx + 1];
+    const para = next.closest('details.para');
+    if(para) para.open = true;
+    PRACTICE.currentLine = next;
+    markPracticeCurrent(next);
+    // 커서도 옮겨서 다음 절을 바로 읽을 수 있게 함
+    try{
+      const sel = window.getSelection();
+      const r = document.createRange();
+      r.selectNodeContents(next);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }catch(_){}
+  }else{
+    stopPractice(true);
+  }
+}
+function handlePracticeResult(recText){
+  if(!PRACTICE.active || !PRACTICE.currentLine) return;
+  const target = getLinePlainForPractice(PRACTICE.currentLine);
+  const spoken = normalizePracticeText(recText);
+  if(!spoken || spoken.length < 3) return;
+
+  let score = 0;
+  const len = Math.min(target.length, spoken.length);
+  for(let i=0;i<len;i++){ if(target[i] === spoken[i]) score++; }
+  const ratio = Math.max(
+    target && spoken && (target.includes(spoken) || spoken.includes(target)) ? (Math.min(target.length, spoken.length) / Math.max(target.length, spoken.length)) : 0,
+    score / Math.max(target.length, spoken.length, 1)
+  );
+  if(ratio < 0.6) return;
+
+  const prev = PRACTICE.counts.get(PRACTICE.currentLine) || 0;
+  const nextCount = prev + 1;
+  PRACTICE.counts.set(PRACTICE.currentLine, nextCount);
+  shadePracticeLine(PRACTICE.currentLine, nextCount);
+  moveToNextPracticeLine(PRACTICE.currentLine);
+}
+function startPractice(startLine){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ alert('이 브라우저는 음성 인식을 지원하지 않습니다.'); return; }
+  if(PRACTICE.active) stopPractice(true);
+
+  const line = startLine || getLineFromSelection() || document.querySelector('details.para[open] .pline');
+  if(!line){ alert('커서가 있는 절을 찾을 수 없습니다. 절을 클릭한 뒤 다시 시도해 주세요.'); return; }
+
+  PRACTICE.active = true;
+  PRACTICE.currentLine = line;
+  markPracticeCurrent(line);
+  const rec = new SR();
+  rec.lang = 'ko-KR';
+  rec.interimResults = true;
+  rec.continuous = true;
+
+  rec.onresult = (ev)=>{
+    const r = ev.results[ev.results.length - 1];
+    const txt = r[0]?.transcript || '';
+    if(r.isFinal) handlePracticeResult(txt);
+  };
+  rec.onerror = (e)=>{
+    if(e.error === 'no-speech' && PRACTICE.active){
+      setTimeout(()=>{ try{ rec.start(); }catch(_){ stopPractice(true); } }, 500);
+      return;
+    }
+    stopPractice(true);
+  };
+  rec.onend = ()=>{
+    if(PRACTICE.active){
+      try{ rec.start(); }catch(_){ stopPractice(true); }
+    }
+  };
+
+  PRACTICE.rec = rec;
+  PRACTICE.btn && (PRACTICE.btn.textContent = '중지');
+  try{
+    rec.start();
+  }catch(e){
+    console.warn('practice start error', e);
+    stopPractice(true);
+  }
+}
+function stopPractice(silent){
+  PRACTICE.active = false;
+  if(PRACTICE.rec){
+    try{ PRACTICE.rec.onend = null; PRACTICE.rec.stop(); }catch(_){}
+  }
+  PRACTICE.rec = null;
+  PRACTICE.currentLine = null;
+  document.querySelectorAll('.practice-current').forEach(el=> el.classList.remove('practice-current'));
+  if(PRACTICE.btn){
+    PRACTICE.btn.textContent = '읽기';
+    PRACTICE.btn = null;
+  }
+  if(!silent){ status && status('읽기가 종료되었습니다.'); }
+}
+function togglePracticeFromToolbar(paraEl, btn){
+  if(PRACTICE.active){
+    stopPractice();
+    return;
+  }
+  PRACTICE.btn = btn || null;
+  const caretLine = getLineFromSelection();
+  let startLine = caretLine;
+  if(!startLine || (paraEl && !paraEl.contains(startLine))){
+    startLine = paraEl?.querySelector?.('.pline') || document.querySelector('details.para[open] .pline');
+  }
+  startPractice(startLine);
+}
+
 function speakVerseItemInScope(item, scope, onend){
   if(!READER.synth) return;
   
@@ -2315,7 +2506,7 @@ function stopSpeakInline(){
   updateInlineSpeakBtn();
   READER.scope = null; READER.btn = null;
 }
-function updateInlineSpeakBtn(){ if(READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독'; }
+function updateInlineSpeakBtn(){ if(READER.btn) READER.btn.textContent = READER.playing ? '중지' : '듣기'; }
 
 function goToNextParagraphInline(book, chap, idx){
   const chObj = BIBLE.books[book][chap];
@@ -2335,7 +2526,7 @@ function goToNextParagraphInline(book, chap, idx){
 
   const paraEls = chapEl.querySelectorAll(':scope > .paras > details.para');
 
-  if (READER.btn) READER.btn.textContent = '낭독';
+  if (READER.btn) READER.btn.textContent = '듣기';
 
   if (idx < chObj.paras.length - 1){
     const nextEl = paraEls[idx + 1];
@@ -2347,7 +2538,7 @@ function goToNextParagraphInline(book, chap, idx){
       CURRENT.paraIdx = idx + 1;
       READER.scope = nextEl;
       READER.btn = nextEl.querySelector('.speakBtn');
-      if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독';
+      if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '듣기';
       return true;
     }
   }
@@ -2368,7 +2559,7 @@ function goToNextParagraphInline(book, chap, idx){
 
         READER.scope = nextParaEl;
         READER.btn = nextParaEl?.querySelector('.speakBtn') || null;
-        if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독';
+        if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '듣기';
         return true;
       }
     }
@@ -2393,7 +2584,7 @@ function goToNextParagraphInline(book, chap, idx){
 
         READER.scope = nextParaEl;
         READER.btn = nextParaEl.querySelector('.speakBtn');
-        if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독';
+        if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '듣기';
         return true;
       }
     }
@@ -3807,7 +3998,7 @@ function stopEditorSpeak(silent){
   EDITOR_TTS.idx = 0;
   
   if(!silent) status('설교 낭독을 중지했습니다.'); 
-  editorSpeakBtn.textContent = '낭독';
+  editorSpeakBtn.textContent = '듣기';
 }
 
 /* --------- Hotkeys --------- */
@@ -4069,7 +4260,7 @@ main { height:auto !important; overflow:visible !important; }
 <footer>
   <span class="muted" id="date"></span><div class="grow"></div>
   <button id="print">인쇄(A4)</button>
-  <button id="read" class="primary">낭독</button>
+  <button id="read" class="primary">듣기</button>
   <button id="stop">중지</button>
   <button class="danger" id="d">삭제</button>
   <button class="primary" id="s">저장</button>
@@ -4772,7 +4963,7 @@ function initSermonPopup(win){
     clearSentenceHighlight();
     
     readPane.style.display = 'none';
-    readBtn.textContent = '낭독';
+    readBtn.textContent = '듣기';
   }
 
   readBtn.onclick = ()=>{
