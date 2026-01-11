@@ -1219,6 +1219,144 @@ const STORAGE_BOOK_STRUCT  = 'WBP3_BOOK_STRUCT';
 const STORAGE_BOOK_SUMMARY = 'WBP3_BOOK_SUMMARY';
 const FMT_NS = 'WBP3_FMT';  // 서식 네임스페이스 (validateState에서 사용)
 
+// ===== [IndexedDB: STORAGE_* 전용] =====
+const IDB_DB_NAME = 'WBP3_STORAGE';
+const IDB_STORE_NAME = 'kv';
+const IDB_VERSION = 1;
+const IDB_MIGRATION_KEY = '__wbp_idb_migrated__';
+
+const IDB_KEYS = [
+  STORAGE_SERMON,
+  STORAGE_LAST_SERMON_PARA,
+  STORAGE_UNIT_CTX,
+  STORAGE_WHOLE_CTX,
+  STORAGE_COMMENTARY,
+  STORAGE_SUMMARY,
+  STORAGE_BOOK_BASIC,
+  STORAGE_BOOK_STRUCT,
+  STORAGE_BOOK_SUMMARY
+];
+
+const _idbSupported = typeof indexedDB !== 'undefined';
+let _idbPromise = null;
+let _idbReady = false;
+let _idbInitPromise = null;
+const _idbCache = new Map();
+const _idbPending = new Map();
+
+function _isIdbKey(key){
+  return IDB_KEYS.includes(key);
+}
+
+function _openIdb(){
+  if (!_idbSupported) return Promise.resolve(null);
+  if (_idbPromise) return _idbPromise;
+  _idbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_DB_NAME, IDB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
+        db.createObjectStore(IDB_STORE_NAME, { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('indexedDB open failed'));
+  });
+  return _idbPromise;
+}
+
+function _idbGet(key){
+  return _openIdb().then(db => {
+    if (!db) return null;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE_NAME, 'readonly');
+      const store = tx.objectStore(IDB_STORE_NAME);
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  });
+}
+
+function _idbPut(key, value){
+  return _openIdb().then(db => {
+    if (!db) return false;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(IDB_STORE_NAME);
+      const req = store.put({ key, value });
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => reject(req.error);
+    });
+  });
+}
+
+function _idbDelete(key){
+  return _openIdb().then(db => {
+    if (!db) return false;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(IDB_STORE_NAME);
+      const req = store.delete(key);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => reject(req.error);
+    });
+  });
+}
+
+function _idbGetValue(key){
+  return _idbGet(key).then(rec => (rec ? rec.value : null));
+}
+
+async function _migrateLocalStorageToIdb(){
+  if (!_idbSupported) return false;
+  try{
+    const migrated = await _idbGetValue(IDB_MIGRATION_KEY);
+    if (migrated) return true;
+    for (const key of IDB_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (raw !== null) {
+        await _idbPut(key, raw);
+        localStorage.removeItem(key);
+      }
+    }
+    await _idbPut(IDB_MIGRATION_KEY, String(Date.now()));
+    return true;
+  } catch (e){
+    console.warn('[IDB] migration failed:', e);
+    return false;
+  }
+}
+
+function _primeIdbCache(){
+  if (!_idbSupported) return Promise.resolve(false);
+  if (_idbInitPromise) return _idbInitPromise;
+  _idbInitPromise = (async () => {
+    try{
+      await _migrateLocalStorageToIdb();
+      for (const key of IDB_KEYS) {
+        const rec = await _idbGet(key);
+        if (rec && typeof rec.value !== 'undefined') _idbCache.set(key, rec.value);
+      }
+      _idbReady = true;
+      for (const [k, v] of _idbPending.entries()) {
+        try { await _idbPut(k, v); } catch(_) {}
+      }
+      _idbPending.clear();
+      return true;
+    } catch (e){
+      console.warn('[IDB] init failed, fallback to localStorage:', e);
+      _idbReady = false;
+      return false;
+    }
+  })();
+  return _idbInitPromise;
+}
+
+if (_idbSupported) {
+  _primeIdbCache();
+}
+
 // ===== [통합 저장 시스템 v4] =====
 const STORAGE_VERSION = 4;
 const STORAGE_SCHEMA_PREFIX = 'wbps.v4';
@@ -1279,7 +1417,13 @@ function backupState(key, value) {
       timestamp: Date.now(),
       data: deepCopy(value)
     };
-    localStorage.setItem(backupKey, JSON.stringify(backupData));
+    const serialized = JSON.stringify(backupData);
+    if (_isIdbKey(key) && _idbSupported) {
+      if (_idbReady) _idbPut(backupKey, serialized).catch(() => {});
+      else _idbPending.set(backupKey, serialized);
+    } else {
+      localStorage.setItem(backupKey, serialized);
+    }
     console.warn('[backupState] Backup created:', backupKey);
     return backupKey;
   } catch (e) {
@@ -1389,8 +1533,18 @@ function saveState(key, value, options = {}) {
       ? finalValue 
       : JSON.stringify(finalValue);
     
-    // 저장 시도
-    localStorage.setItem(key, serialized);
+    // 저장 시도 (STORAGE_*는 IndexedDB 우선)
+    if (_isIdbKey(key) && _idbSupported) {
+      _idbCache.set(key, serialized);
+      if (_idbReady) {
+        _idbPut(key, serialized).catch(e => console.warn('[IDB] save failed:', e));
+      } else {
+        _idbPending.set(key, serialized);
+        _primeIdbCache();
+      }
+    } else {
+      localStorage.setItem(key, serialized);
+    }
     
     // 버튼 색상 업데이트 (내용 또는 서식 관련 키인 경우)
     if (key === STORAGE_SERMON || key === STORAGE_UNIT_CTX || key === STORAGE_WHOLE_CTX || 
@@ -1413,6 +1567,26 @@ function saveState(key, value, options = {}) {
     console.error('[saveState] Save failed:', e);
     // 저장 실패 시 백업 생성
     backupState(key, value);
+    return false;
+  }
+}
+
+function removeState(key){
+  try{
+    if (_isIdbKey(key) && _idbSupported) {
+      _idbCache.delete(key);
+      _idbPending.delete(key);
+      if (_idbReady) {
+        _idbDelete(key).catch(e => console.warn('[IDB] delete failed:', e));
+      } else {
+        _primeIdbCache();
+      }
+    } else {
+      localStorage.removeItem(key);
+    }
+    return true;
+  } catch (e){
+    console.warn('[removeState] failed:', e);
     return false;
   }
 }
@@ -1511,7 +1685,22 @@ document.addEventListener('wbp:treeBuilt', ()=> setTimeout(autoStartInlineReadin
 // 통합 로딩 함수
 function loadState(key, defaultValue = null, options = {}) {
   try {
-    const raw = localStorage.getItem(key);
+    let raw = null;
+    if (_isIdbKey(key) && _idbSupported) {
+      if (_idbCache.has(key)) {
+        raw = _idbCache.get(key);
+      } else {
+        if (_idbReady) {
+          _idbGet(key).then(rec => {
+            if (rec && typeof rec.value !== 'undefined') _idbCache.set(key, rec.value);
+          }).catch(() => {});
+        } else {
+          _primeIdbCache();
+        }
+      }
+    } else {
+      raw = localStorage.getItem(key);
+    }
     if (raw === null) {
       return defaultValue;
     }
@@ -1700,7 +1889,7 @@ async function importAllData(file){
     if(!json || json.__wbps!==1 || !json.items){ alert('백업 파일 형식이 아닙니다.'); return; }
     if(!confirm('이 백업으로 현재 기기의 데이터를 덮어쓸까요?')) return;
     Object.entries(json.items).forEach(([k,v])=>{
-      if(v===null || v===undefined) localStorage.removeItem(k);
+      if(v===null || v===undefined) removeState(k);
       else saveState(k, v);
     });
     status('가져오기가 완료되었습니다. 페이지를 새로고침하면 반영됩니다.');
