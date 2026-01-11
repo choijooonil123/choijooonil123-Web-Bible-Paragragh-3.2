@@ -1562,11 +1562,118 @@ function loadState(key, defaultValue = null, options = {}) {
 })();
 // ===== [통합 저장 시스템 v4] END =====
 
+function syncSermonEditorForExport(){
+  try{
+    if (!sermonEditor || sermonEditor.style.display === 'none') return;
+
+    const rawTitle = (sermonTitle?.value || '').trim();
+    const title = rawTitle || '(제목 없음)';
+    let body = getBodyHTML ? (getBodyHTML() || '') : '';
+    body = body.replace(/^\s+|\s+$/g, '');
+
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const imgs = [];
+
+    const ctxType = sermonEditor.dataset?.ctxType || '';
+    if (ctxType) {
+      if (ctxType.startsWith('book-')) {
+        const bookName = sermonEditor.dataset.bookName;
+        if (!bookName) return;
+        const storeKey =
+          ctxType === 'book-basic'  ? STORAGE_BOOK_BASIC  :
+          ctxType === 'book-struct' ? STORAGE_BOOK_STRUCT :
+                                      STORAGE_BOOK_SUMMARY;
+        const map = getDocMap(storeKey);
+        map[bookName] = { title, body, images: imgs, date };
+        setDocMap(storeKey, map);
+        return;
+      }
+
+      if (!CURRENT.book || !Number.isFinite(CURRENT.chap) || !Number.isFinite(CURRENT.paraIdx)) {
+        if (!syncCurrentFromOpen()) return;
+      }
+      const para = BIBLE?.books?.[CURRENT.book]?.[CURRENT.chap]?.paras?.[CURRENT.paraIdx];
+      if (!para) return;
+      const pid = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
+
+      const key =
+        ctxType === 'unit'       ? STORAGE_UNIT_CTX :
+        ctxType === 'whole'      ? STORAGE_WHOLE_CTX :
+        ctxType === 'commentary' ? STORAGE_COMMENTARY :
+                                   STORAGE_SUMMARY;
+
+      const map = getDocMap(key);
+      map[pid] = { title, body, images: imgs, date };
+      setDocMap(key, map);
+      return;
+    }
+
+    if (!CURRENT.paraId) {
+      if (!syncCurrentFromOpen()) return;
+      const para = BIBLE?.books?.[CURRENT.book]?.[CURRENT.chap]?.paras?.[CURRENT.paraIdx];
+      if (!para) return;
+      CURRENT.paraId = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
+    }
+
+    const map = getSermonMap();
+    const arr = map[CURRENT.paraId] || [];
+    const editing = sermonEditor.dataset?.editing ?? '';
+
+    let focus = '';
+    let keywords = '';
+    let target = '';
+    if (editing !== '' && CURRENT.paraId) {
+      const i = +editing;
+      const existing = arr[i];
+      if (existing) {
+        focus = existing.focus || '';
+        keywords = existing.keywords || '';
+        target = existing.target || '';
+      }
+    }
+
+    const focusEl = document.getElementById('sermonFocus');
+    const keywordsEl = document.getElementById('sermonKeywords');
+    const targetEl = document.getElementById('sermonTarget');
+    if (focusEl && focusEl.offsetParent !== null) focus = (focusEl.value || '').trim();
+    if (keywordsEl && keywordsEl.offsetParent !== null) keywords = (keywordsEl.value || '').trim();
+    if (targetEl && targetEl.offsetParent !== null) target = (targetEl.value || '').trim();
+
+    const hasBodyText = body.replace(/<[^>]*>/g, '').trim();
+    const hasContent = rawTitle || hasBodyText || focus || keywords || target;
+    if (editing === '' && !hasContent) return;
+
+    if (editing !== '' && arr[+editing]) {
+      const i = +editing;
+      arr[i] = { ...arr[i], title, body, images: imgs, date, focus, keywords, target };
+    } else {
+      arr.unshift({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        title,
+        body,
+        images: imgs,
+        date,
+        link: '',
+        focus,
+        keywords,
+        target
+      });
+    }
+
+    map[CURRENT.paraId] = arr;
+    setSermonMap(map, true);
+  } catch(e){
+    console.warn('[syncSermonEditorForExport] failed:', e);
+  }
+}
+
 function todayStr(){
   const d=new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function exportAllData(){
+  syncSermonEditorForExport();
   const keys = [STORAGE_SERMON, STORAGE_UNIT_CTX, STORAGE_WHOLE_CTX, STORAGE_COMMENTARY, STORAGE_SUMMARY, VOICE_CHOICE_KEY];
   const payload = { __wbps:1, date: todayStr(), items:{} };
   keys.forEach(k=> payload.items[k] = loadState(k, null));
