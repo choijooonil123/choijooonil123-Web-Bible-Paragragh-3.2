@@ -2041,7 +2041,10 @@ function ensureBookSermonControls(){
   btnImp.textContent = '설교가져오기';
   btnImp.className = 'sermon-book-btn';
   wrap.append(select, btnExp, btnImp);
-  if(anchor.tagName === 'HEADER'){
+  const importBtn = doc.getElementById('btnImportAll');
+  if (importBtn && importBtn.parentElement) {
+    importBtn.insertAdjacentElement('afterend', wrap);
+  } else if (anchor.tagName === 'HEADER'){
     anchor.appendChild(wrap);
   } else {
     anchor.insertAdjacentElement('afterend', wrap);
