@@ -1899,6 +1899,185 @@ async function importAllData(file){
   }
 }
 
+const SERMON_BOOK_IMPORT_INPUT_ID = 'sermonBookImportInput';
+const SERMON_BOOK_CTRL_ID = 'sermonBookControls';
+
+function collectSermonsForBook(bookName){
+  if(!bookName) return {};
+  const map = getSermonMap();
+  const matched = {};
+  Object.entries(map).forEach(([pid, arr])=>{
+    if(pid.startsWith(`${bookName}|`)){
+      matched[pid] = arr;
+    }
+  });
+  return matched;
+}
+
+function exportSermonsForBook(bookName){
+  if(!bookName){
+    alert('책을 선택한 뒤 내보내기를 실행하세요.');
+    return;
+  }
+  const sermons = collectSermonsForBook(bookName);
+  const keys = Object.keys(sermons);
+  if(!keys.length){
+    alert(`${bookName}에 저장된 설교가 없습니다.`);
+    return;
+  }
+  const payload = {
+    type: 'wbps-sermon-book',
+    book: bookName,
+    exportedAt: new Date().toISOString(),
+    count: keys.length,
+    items: sermons
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  const sanitized = bookName.replace(/\s+/g,'_');
+  const ts = new Date();
+  const stamp = `${ts.getFullYear()}${String(ts.getMonth()+1).padStart(2,'0')}${String(ts.getDate()).padStart(2,'0')}-${String(ts.getHours()).padStart(2,'0')}${String(ts.getMinutes()).padStart(2,'0')}`;
+  a.href = URL.createObjectURL(blob);
+  a.download = `wbps-sermons-${sanitized}-${stamp}.json`;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  status(`${bookName} 설교 ${keys.length}개 내보내기 완료`);
+}
+
+function applySermonsForBook(bookName, items){
+  if(!bookName || !items || typeof items !== 'object') return 0;
+  const map = getSermonMap();
+  let applied = 0;
+  Object.entries(items).forEach(([pid, arr])=>{
+    if(!pid.startsWith(`${bookName}|`)) return;
+    map[pid] = Array.isArray(arr) ? arr : [];
+    applied++;
+  });
+  if(applied){
+    setSermonMap(map, true);
+  }
+  return applied;
+}
+
+function handleSermonBookImport(file, selectedBook){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const json = JSON.parse(String(reader.result||'{}'));
+      const items = json.items || json.sermons || json.data || null;
+      const bookFromFile = json.book || json.targetBook || selectedBook;
+      const bookName = selectedBook || bookFromFile;
+      if(!items || typeof items !== 'object'){
+        alert('설교 데이터가 없습니다. 올바른 파일을 선택했는지 확인하세요.');
+        return;
+      }
+      if(!bookName){
+        alert('가져올 책을 먼저 선택하세요.');
+        return;
+      }
+      const candidates = Object.keys(items).filter(pid=>pid.startsWith(`${bookName}|`));
+      if(!candidates.length){
+        alert(`${bookName} 관련 설교가 파일에 없습니다.`);
+        return;
+      }
+      if(!confirm(`"${bookName}" 설교 ${candidates.length}개를 가져옵니다. 동일 ID는 덮어쓰기 됩니다. 계속할까요?`)) return;
+      const applied = applySermonsForBook(bookName, items);
+      status(`${bookName} 설교 ${applied}개 가져오기 완료`);
+      alert(`설교 가져오기 완료: ${bookName} (${applied}개 적용)`);
+    }catch(e){
+      console.error(e);
+      alert('설교 가져오기 중 오류가 발생했습니다. JSON 형식을 확인하세요.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function refreshSermonBookSelect(select){
+  if(!select) return;
+  select.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '-- 책 선택 --';
+  select.appendChild(placeholder);
+  if(BIBLE && BIBLE.books){
+    Object.keys(BIBLE.books).forEach(book=>{
+      const opt = document.createElement('option');
+      opt.value = book;
+      opt.textContent = book;
+      select.appendChild(opt);
+    });
+  }
+  const openBook = document.querySelector('details.book[open] summary .btitle');
+  if(openBook && openBook.dataset.book){
+    select.value = openBook.dataset.book;
+  } else if(select.options.length > 1){
+    select.selectedIndex = 1;
+  }
+}
+
+function ensureBookSermonControls(){
+  const doc = document;
+  if(doc.getElementById(SERMON_BOOK_CTRL_ID)) return;
+  const anchor =
+    doc.getElementById('btnFmtImport') ||
+    doc.getElementById('btnImportAll') ||
+    doc.querySelector('header');
+  if(!anchor) return;
+  const wrap = doc.createElement('div');
+  wrap.id = SERMON_BOOK_CTRL_ID;
+  wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-left:6px;';
+  const select = doc.createElement('select');
+  select.id = 'sermonBookSelect';
+  select.style.cssText = 'background:var(--panel,#161922);color:var(--text,#e6e8ef);border:1px solid var(--border,#252a36);border-radius:6px;padding:4px 8px;font-size:12px;';
+  refreshSermonBookSelect(select);
+  const btnExp = doc.createElement('button');
+  btnExp.id = 'btnSermonBookExport';
+  btnExp.type = 'button';
+  btnExp.textContent = '설교내보내기';
+  btnExp.className = 'sermon-book-btn';
+  const btnImp = doc.createElement('button');
+  btnImp.id = 'btnSermonBookImport';
+  btnImp.type = 'button';
+  btnImp.textContent = '설교가져오기';
+  btnImp.className = 'sermon-book-btn';
+  wrap.append(select, btnExp, btnImp);
+  if(anchor.tagName === 'HEADER'){
+    anchor.appendChild(wrap);
+  } else {
+    anchor.insertAdjacentElement('afterend', wrap);
+  }
+
+  btnExp.addEventListener('click', ()=>{
+    const book = select.value || select.options[select.selectedIndex]?.value;
+    exportSermonsForBook(book);
+  });
+  btnImp.addEventListener('click', ()=>{
+    const book = select.value || select.options[select.selectedIndex]?.value;
+    const input = doc.getElementById(SERMON_BOOK_IMPORT_INPUT_ID);
+    if(input){
+      input.dataset.targetBook = book || '';
+      input.click();
+    }
+  });
+
+  const fileInput = doc.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'application/json,.json';
+  fileInput.id = SERMON_BOOK_IMPORT_INPUT_ID;
+  fileInput.style.display = 'none';
+  fileInput.addEventListener('change', (e)=>{
+    const file = e.target.files?.[0];
+    if(!file) return;
+    const book = e.target.dataset.targetBook || select.value || select.options[select.selectedIndex]?.value;
+    handleSermonBookImport(file, book);
+    e.target.value = '';
+    delete e.target.dataset.targetBook;
+  });
+  doc.body.appendChild(fileInput);
+}
+
+document.addEventListener('wbp:treeBuilt', ensureBookSermonControls);
+
 /* --------- Refs / State --------- */
 const voiceSelect = el('voiceSelect'), testVoiceBtn = el('testVoice');
 const rateCtl = el('rateCtl'), pitchCtl = el('pitchCtl'), voiceHint = el('voiceHint');
