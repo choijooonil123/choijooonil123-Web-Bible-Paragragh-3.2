@@ -5611,7 +5611,7 @@ function createFloatingToolbar(options) {
 /* === 절문장 전용 서식 툴바 === */
 (function(){
   const bar = document.getElementById('vbar') || document.getElementById('wbp-plbar');
-  const color = document.getElementById('vcolor');
+  let color = document.getElementById('vcolor');
   const docEl = document.getElementById('doc');
 
   // ===== [INIT HOOK] BEGIN =====
@@ -5639,6 +5639,17 @@ function createFloatingToolbar(options) {
 
   const treeEl = document.getElementById('tree');
   if(!bar || !treeEl) return;
+
+  // 설교 편집기에서도 글자색 적용을 위한 컬러 입력 보강
+  if (!color) {
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.id = 'vcolor';
+    colorInput.title = '글자색';
+    colorInput.style.cssText = 'width:30px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,.12);padding:0;background:transparent;cursor:pointer;';
+    bar.appendChild(colorInput);
+    color = colorInput;
+  }
 
   // 🔍 디버깅 패널 생성 (전역 스코프)
   if (!window.__WBP_DEBUG_PANEL) {
@@ -5849,25 +5860,34 @@ function createFloatingToolbar(options) {
         const endInSermonBody = sermonBody.contains(endNode);
         const elInSermonBody = sermonBody.contains(el) || el === sermonBody;
         
-        if (startInSermonBody || endInSermonBody || elInSermonBody) {
-          // 모든 편집기 모드에서 플로팅 툴바 허용
+      if (startInSermonBody || endInSermonBody || elInSermonBody) {
+          // 모든 설교 편집기 모드에서 플로팅 툴바 허용
+          // - 일반 설교보기 편집기: ctxType 없음
           // - 책 단위: book-basic, book-struct, book-summary
           // - 단락 단위: summary, unit, whole, commentary
-          const ctxType = sermonEditor.dataset.ctxType;
-          if (ctxType) {
-            // 책 단위 편집기 또는 단락 단위 편집기 모두 허용
-            const allowedTypes = ['summary', 'unit', 'whole', 'commentary'];
-            if (ctxType.startsWith('book-') || allowedTypes.includes(ctxType)) {
-              if (DEBUG) {
-                console.log('[inVerse] ✅ #sermonBody 선택 허용 (편집기)', {
-                  startInSermonBody,
-                  endInSermonBody,
-                  elInSermonBody,
-                  ctxType
-                });
-              }
-              return true; // 편집기에서는 허용
+          const ctxType = sermonEditor.dataset.ctxType || '';
+          if (!ctxType) {
+            if (DEBUG) {
+              console.log('[inVerse] ✅ #sermonBody 선택 허용 (설교보기)', {
+                startInSermonBody,
+                endInSermonBody,
+                elInSermonBody
+              });
             }
+            return true;
+          }
+          // 책 단위 편집기 또는 단락 단위 편집기 모두 허용
+          const allowedTypes = ['summary', 'unit', 'whole', 'commentary'];
+          if (ctxType.startsWith('book-') || allowedTypes.includes(ctxType)) {
+            if (DEBUG) {
+              console.log('[inVerse] ✅ #sermonBody 선택 허용 (편집기)', {
+                startInSermonBody,
+                endInSermonBody,
+                elInSermonBody,
+                ctxType
+              });
+            }
+            return true; // 편집기에서는 허용
           }
           if (DEBUG) {
             console.log('[inVerse] ❌ #sermonBody 선택 제외', {
@@ -5880,7 +5900,7 @@ function createFloatingToolbar(options) {
               elClass: el.className
             });
           }
-          return false; // 다른 모드에서는 제외
+      return false; // 다른 모드에서는 제외
         }
       }
     }
