@@ -1649,7 +1649,7 @@ function syncSermonEditorForExport(){
       arr[i] = { ...arr[i], title, body, images: imgs, date, focus, keywords, target };
     } else {
       arr.unshift({
-        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        id: safeRandomId(),
         title,
         body,
         images: imgs,
@@ -1671,6 +1671,12 @@ function syncSermonEditorForExport(){
 function todayStr(){
   const d=new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function safeRandomId(){
+  try{
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  }catch(_){}
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 function exportAllData(){
   syncSermonEditorForExport();
@@ -3555,7 +3561,7 @@ function openSermonInputModal(){
     // 파싱된 모든 설교 추가
     sermons.forEach(sermon => {
       if (sermon.title) {
-        const newId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random() + Math.random());
+        const newId = safeRandomId();
         arr.unshift({ 
           id: newId, 
           title: sermon.title, 
@@ -3894,7 +3900,7 @@ el('saveSermon').onclick = () => {
     }
   } else {
     arr.unshift({
-      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      id: safeRandomId(),
       title,
       body,
       images: imgs,
@@ -4407,7 +4413,7 @@ main { height:auto !important; overflow:visible !important; }
           // 빈 설교를 실제 내용으로 교체
           arr2[0] = { id: newId, title: data.title, body: data.body, images: data.images || [], date, link: arr2[0].link || '' };
         } else {
-          newId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+          newId = safeRandomId();
           // 배열이 idx보다 작으면 확장
           while (arr2.length <= idx) {
             arr2.push(null);
