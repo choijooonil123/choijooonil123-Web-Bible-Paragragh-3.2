@@ -393,16 +393,137 @@
     <div class="pill"><button id="btnSaveJSON">JSON 저장</button></div>
 
     <div class="pill">
-      <button id="btnExportAll" class="primary">내용내보내기</button>
+      <button id="btnExportAll">내용내보내기</button>
       <input id="importFile" type="file" accept="application/json" style="display:none">
       <button id="btnImportAll">내용가져오기</button>
     </div>
-    <div class="pill">
-      <button id="btnExportSermons" class="primary">설교내보내기</button>
-      <input id="sermonImportFile" type="file" accept="application/json" style="display:none">
-      <button id="btnImportSermons">설교가져오기</button>
+
+    <div class="pill" style="position:relative;">
+      <button id="btnVoiceSettings">🎤 내 음성 설정</button>
     </div>
   </header>
+
+  <!-- 음성 설정 모달 -->
+  <div id="voiceSettingsModal" class="modal-backdrop" aria-hidden="true" style="display:none;">
+    <div class="modal" style="width:min(600px, 94vw); max-height:90vh; overflow-y:auto;">
+      <div class="head">
+        <strong>🎤 내 음성으로 낭독 설정</strong>
+        <div class="grow"></div>
+        <button id="closeVoiceSettings">닫기</button>
+      </div>
+      <div style="padding:16px; display:flex; flex-direction:column; gap:16px;">
+        
+        <!-- 음성 모드 선택 -->
+        <div>
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">음성 엔진 선택</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; padding:8px 12px; border:1px solid var(--border); border-radius:8px; flex:1; min-width:120px;">
+              <input type="radio" name="voiceEngine" value="browser" id="voiceEngineBrowser" checked>
+              <span>브라우저 TTS</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; padding:8px 12px; border:1px solid var(--border); border-radius:8px; flex:1; min-width:120px;">
+              <input type="radio" name="voiceEngine" value="chatterbox" id="voiceEngineChatterbox">
+              <span>🆓 Chatterbox</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; padding:8px 12px; border:1px solid var(--border); border-radius:8px; flex:1; min-width:120px;">
+              <input type="radio" name="voiceEngine" value="elevenlabs" id="voiceEngineElevenLabs">
+              <span>ElevenLabs</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Chatterbox 설정 -->
+        <div id="chatterboxSettings" style="display:none; padding:16px; background:var(--bg); border-radius:10px; border:1px solid var(--border);">
+          <div style="background:color-mix(in srgb, #52c41a 15%, var(--panel)); padding:12px; border-radius:10px; border-left:3px solid #52c41a; margin-bottom:14px;">
+            <p style="margin:0 0 8px 0; font-weight:600; color:#52c41a;">🆓 Chatterbox - 무료 음성 복제!</p>
+            <ol style="margin:0; padding-left:20px; color:var(--muted); font-size:0.9em; line-height:1.6;">
+              <li><a href="https://colab.research.google.com/github/resemble-ai/chatterbox/blob/main/chatterbox_demo.ipynb" target="_blank" style="color:#52c41a;">Chatterbox Colab 노트북</a> 열기</li>
+              <li>모든 셀 실행 (GPU 런타임 필요)</li>
+              <li>내 음성 파일(.wav) 업로드</li>
+              <li>Gradio 앱 실행 후 생성된 <b>Public URL</b>을 아래에 입력</li>
+            </ol>
+          </div>
+          
+          <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">Chatterbox Gradio URL</label>
+            <input type="text" id="chatterboxUrl" placeholder="https://xxxxxxxx.gradio.live" 
+                   style="width:100%; padding:10px 12px; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:8px;">
+            <small style="color:var(--muted); font-size:11px;">Colab 실행 후 나오는 "Running on public URL:" 주소</small>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">음성 파일 경로 (Colab 내)</label>
+            <input type="text" id="chatterboxVoicePath" placeholder="/content/my_voice.wav" value="/content/audio.wav"
+                   style="width:100%; padding:10px 12px; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:8px;">
+            <small style="color:var(--muted); font-size:11px;">Colab에 업로드한 음성 파일 경로</small>
+          </div>
+
+          <div style="display:flex; gap:12px;">
+            <div style="flex:1;">
+              <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">과장도 (Exaggeration): <span id="chatterboxExagVal">0.5</span></label>
+              <input type="range" id="chatterboxExag" min="0" max="1" step="0.05" value="0.5" style="width:100%;">
+            </div>
+            <div style="flex:1;">
+              <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">CFG 강도: <span id="chatterboxCfgVal">0.5</span></label>
+              <input type="range" id="chatterboxCfg" min="0" max="1" step="0.05" value="0.5" style="width:100%;">
+            </div>
+          </div>
+        </div>
+
+        <!-- ElevenLabs 설정 (조건부 표시) -->
+        <div id="elevenLabsSettings" style="display:none; padding:16px; background:var(--bg); border-radius:10px; border:1px solid var(--border);">
+          <div style="background:color-mix(in srgb, var(--accent) 15%, var(--panel)); padding:12px; border-radius:10px; border-left:3px solid var(--accent); margin-bottom:14px;">
+            <p style="margin:0 0 8px 0; font-weight:600; color:var(--accent);">💡 ElevenLabs 설정 (유료)</p>
+            <ol style="margin:0; padding-left:20px; color:var(--muted); font-size:0.9em; line-height:1.6;">
+              <li><a href="https://elevenlabs.io" target="_blank" style="color:var(--accent);">ElevenLabs.io</a>에 가입</li>
+              <li>Voice Lab에서 내 목소리 복제</li>
+              <li>API 키와 Voice ID 입력</li>
+            </ol>
+          </div>
+          
+          <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">ElevenLabs API 키</label>
+            <input type="password" id="elevenLabsApiKey" placeholder="xi_xxxxxxxxxxxxxxxx" 
+                   style="width:100%; padding:10px 12px; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:8px;">
+          </div>
+          
+          <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">Voice ID</label>
+            <input type="text" id="elevenLabsVoiceId" placeholder="xxxxxxxxxxxxxxxxxxxxxxxx" 
+                   style="width:100%; padding:10px 12px; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:8px;">
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">음성 모델</label>
+            <select id="elevenLabsModel" style="width:100%; padding:10px 12px; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:8px;">
+              <option value="eleven_multilingual_v2">Multilingual v2 (추천)</option>
+              <option value="eleven_turbo_v2_5">Turbo v2.5 (빠름)</option>
+            </select>
+          </div>
+
+          <div style="display:flex; gap:12px;">
+            <div style="flex:1;">
+              <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">안정성: <span id="stabilityVal">0.5</span></label>
+              <input type="range" id="elevenLabsStability" min="0" max="1" step="0.05" value="0.5" style="width:100%;">
+            </div>
+            <div style="flex:1;">
+              <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px;">유사도: <span id="similarityVal">0.75</span></label>
+              <input type="range" id="elevenLabsSimilarity" min="0" max="1" step="0.05" value="0.75" style="width:100%;">
+            </div>
+          </div>
+        </div>
+
+        <!-- 테스트 버튼 -->
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button id="testVoiceBtn" class="primary" style="flex:1;">🔊 음성 테스트</button>
+          <span id="voiceTestStatus" style="color:var(--muted); font-size:12px;"></span>
+        </div>
+
+        <!-- 저장 버튼 -->
+        <button id="saveVoiceSettings" class="primary" style="padding:12px;">💾 설정 저장</button>
+      </div>
+    </div>
+  </div>
 
   <div class="layout">
     <section class="card">
