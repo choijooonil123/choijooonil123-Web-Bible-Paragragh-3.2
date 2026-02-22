@@ -67,44 +67,6 @@
     .ptoolbar{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px }
     .ptoolbar .spacer { flex: 1 1 auto; }
     
-    /* 성경본문 서식 버튼 영역 */
-    .pcontent-format-toolbar {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-      margin-left: 8px;
-    }
-    .pcontent-format-toolbar .fmt-btn {
-      padding: 4px 8px;
-      border: 1px solid var(--border);
-      background: var(--panel);
-      color: var(--text);
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      font-weight: 600;
-    }
-    .pcontent-format-toolbar .fmt-btn:hover {
-      background: color-mix(in hsl, var(--panel) 85%, white 15%);
-      border-color: var(--accent);
-    }
-    .pcontent-format-toolbar .fmt-color-palette {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-      margin-left: 4px;
-    }
-    .pcontent-format-toolbar .fmt-color-btn {
-      cursor: pointer;
-      border: 1px solid #2a3040;
-      border-radius: 4px;
-      transition: transform 0.1s, box-shadow 0.1s;
-    }
-    .pcontent-format-toolbar .fmt-color-btn:hover {
-      transform: scale(1.15);
-      box-shadow: 0 0 8px rgba(110, 168, 254, 0.4);
-    }
-
     .pline{ padding:4px 6px; border-left:3px solid transparent; border-radius:8px; transition: background .15s, border-color .15s }
     .pline:hover{ background:color-mix(in hsl, var(--panel) 80%, black 12%) }
     .pline.reading{ background:color-mix(in hsl, var(--accent) 15%, black 0%); border-left-color:var(--accent); position:relative }
@@ -240,6 +202,19 @@
     /* 편집 모드 표시(선택) */
     details.para .pcontent[contenteditable="true"]{
       outline: 1px dashed #3b4b7a; outline-offset: 2px;
+    }
+    
+    /* 🔧 절 내용(.pline) 선택/편집 가능 표시 */
+    .pline {
+      cursor: text;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .pline::selection, .pline *::selection {
+      background: rgba(110, 168, 254, 0.35);
+    }
+    .pcontent[contenteditable="true"] .pline:hover {
+      background: color-mix(in hsl, var(--panel) 75%, var(--accent) 5%);
     }
 
     /* ===== Unit Chips (ptitle 옆 흐릿한 버튼) ===== */
@@ -406,6 +381,9 @@
 
   </style>
 
+  <!-- 🚀 폰트 최적화: preconnect로 DNS/TLS 미리 연결 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&family=Nanum+Myeongjo&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -415,9 +393,14 @@
     <div class="pill"><button id="btnSaveJSON">JSON 저장</button></div>
 
     <div class="pill">
-      <button id="btnExportAll">내용내보내기</button>
+      <button id="btnExportAll" class="primary">내용내보내기</button>
       <input id="importFile" type="file" accept="application/json" style="display:none">
       <button id="btnImportAll">내용가져오기</button>
+    </div>
+    <div class="pill">
+      <button id="btnExportSermons" class="primary">설교내보내기</button>
+      <input id="sermonImportFile" type="file" accept="application/json" style="display:none">
+      <button id="btnImportSermons">설교가져오기</button>
     </div>
   </header>
 
@@ -484,6 +467,147 @@
     <!-- 여기 뒤에 7색 팔레트가 JS로 주입됩니다 -->
   </div>
 
+  <!-- 🚀 JSON 캐싱 시스템 (IndexedDB) - 재방문 시 즉시 로딩 -->
+  <script>
+  (function setupBibleCache() {
+    const DB_NAME = 'WBP_BibleCache';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'bibleData';
+    const CACHE_KEY = 'bible-paragraphs';
+    const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7일
+
+    // IndexedDB 열기
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'key' });
+          }
+        };
+      });
+    }
+
+    // 캐시에서 읽기
+    async function getFromCache(key) {
+      try {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.get(key);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      } catch (e) {
+        console.warn('[BibleCache] IndexedDB not available:', e);
+        return null;
+      }
+    }
+
+    // 캐시에 저장
+    async function saveToCache(key, data) {
+      try {
+        const db = await openDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          const request = store.put({
+            key,
+            data,
+            timestamp: Date.now()
+          });
+          request.onsuccess = () => resolve(true);
+          request.onerror = () => reject(request.error);
+        });
+      } catch (e) {
+        console.warn('[BibleCache] Failed to save:', e);
+        return false;
+      }
+    }
+
+    // 캐시 유효성 검사
+    function isCacheValid(cached) {
+      if (!cached || !cached.data || !cached.timestamp) return false;
+      return (Date.now() - cached.timestamp) < CACHE_DURATION;
+    }
+
+    // 전역 함수로 노출 - app.js에서 사용
+    window.__WBP_BIBLE_CACHE__ = {
+      async loadBible() {
+        const startTime = performance.now();
+        
+        // 1) 캐시 확인
+        const cached = await getFromCache(CACHE_KEY);
+        if (isCacheValid(cached)) {
+          const loadTime = (performance.now() - startTime).toFixed(0);
+          console.log(`[BibleCache] ✅ 캐시에서 로드됨 (${loadTime}ms)`);
+          return cached.data;
+        }
+
+        // 2) 네트워크에서 fetch
+        console.log('[BibleCache] 🌐 네트워크에서 다운로드 중...');
+        let data = null;
+        try {
+          const res = await fetch('bible-paragraphs.json', { cache: 'no-store' });
+          if (res.ok) data = await res.json();
+        } catch (_) {}
+        
+        if (!data) {
+          try {
+            const res = await fetch('bible_paragraphs.json', { cache: 'no-store' });
+            if (res.ok) data = await res.json();
+          } catch (_) {}
+        }
+
+        if (!data) {
+          throw new Error('bible-paragraphs.json을 찾을 수 없습니다.');
+        }
+
+        // 3) 캐시에 저장 (백그라운드)
+        saveToCache(CACHE_KEY, data).then(() => {
+          const loadTime = (performance.now() - startTime).toFixed(0);
+          console.log(`[BibleCache] 💾 캐시에 저장됨 (총 ${loadTime}ms)`);
+        });
+
+        return data;
+      },
+
+      // 캐시 강제 새로고침
+      async refreshCache() {
+        try {
+          const res = await fetch('bible-paragraphs.json', { cache: 'no-store' });
+          if (!res.ok) throw new Error('Fetch failed');
+          const data = await res.json();
+          await saveToCache(CACHE_KEY, data);
+          console.log('[BibleCache] 🔄 캐시 갱신 완료');
+          return data;
+        } catch (e) {
+          console.error('[BibleCache] 캐시 갱신 실패:', e);
+          return null;
+        }
+      },
+
+      // 캐시 삭제
+      async clearCache() {
+        try {
+          const db = await openDB();
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).delete(CACHE_KEY);
+          console.log('[BibleCache] 🗑️ 캐시 삭제됨');
+        } catch (e) {
+          console.error('[BibleCache] 캐시 삭제 실패:', e);
+        }
+      }
+    };
+
+    console.log('[BibleCache] 🚀 캐싱 시스템 초기화 완료');
+  })();
+  </script>
+
   <!-- 앱 본체 -->
   <script src="app.js" defer></script>
 
@@ -494,20 +618,19 @@
     map: {},
     load(){
       try { 
-        if (typeof loadState === 'function') {
-          this.map = loadState(WBP_FMT_KEY, {});
+        const raw = localStorage.getItem(WBP_FMT_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          // app.js의 saveState 형식 호환: data 필드가 있으면 그 안의 값 사용
+          this.map = (parsed && typeof parsed === 'object' && parsed.data) ? parsed.data : (parsed || {});
         } else {
-          this.map = JSON.parse(localStorage.getItem(WBP_FMT_KEY) || '{}');
+          this.map = {};
         }
       }
       catch { this.map = {}; }
     },
     save(){ 
-      if (typeof saveState === 'function') {
-        saveState(WBP_FMT_KEY, this.map);
-      } else {
-        localStorage.setItem(WBP_FMT_KEY, JSON.stringify(this.map));
-      }
+      localStorage.setItem(WBP_FMT_KEY, JSON.stringify(this.map));
       // 서식 저장 후 버튼 색상 업데이트
       if (typeof updateButtonColors === 'function') {
         setTimeout(updateButtonColors, 100);
@@ -616,6 +739,7 @@
       if(!sel || !sel.rangeCount) return null;
       const n = sel.getRangeAt(0).commonAncestorContainer;
       const el = (n.nodeType===1 ? n : n.parentElement);
+      
       // 모든 편집기의 #sermonBody 인식
       // - 책 단위: book-basic, book-struct, book-summary
       // - 단락 단위: summary, unit, whole, commentary
@@ -630,7 +754,27 @@
           }
         }
       }
-      return el?.closest?.('.pline, .verse-line, p.verse') || null;
+      
+      // 🔧 .pline 우선, 없으면 .pcontent 내부의 선택도 허용
+      const pline = el?.closest?.('.pline, .verse-line, p.verse');
+      if (pline) return pline;
+      
+      // .pcontent 내부에서 직접 선택한 경우 (다중 절 선택 등)
+      const pcontent = el?.closest?.('.pcontent');
+      if (pcontent && pcontent.closest('#tree')) {
+        // 선택 범위의 시작점에서 가장 가까운 .pline 찾기
+        const range = sel.getRangeAt(0);
+        const startEl = range.startContainer.nodeType === 1 
+          ? range.startContainer 
+          : range.startContainer.parentElement;
+        const nearestPline = startEl?.closest?.('.pline, .verse-line, p.verse');
+        if (nearestPline) return nearestPline;
+        
+        // 그래도 없으면 pcontent 자체 반환 (다중 절 선택 시)
+        return pcontent;
+      }
+      
+      return null;
     }
     function hasRealSelection(){
       const sel = window.getSelection?.();
@@ -764,11 +908,61 @@
         inputTimeout = null;
       }, 200); // 120ms에서 200ms로 증가하여 무한 루프 방지
     });
-    // mouseup과 selectionchange 이벤트는 app.js의 createFloatingToolbar에서 처리하므로 중복 제거
-    // document.addEventListener('mouseup', ()=> setTimeout(showBarMaybe, 0));
-    // document.addEventListener('selectionchange', ()=> setTimeout(showBarMaybe, 0));
+    // mouseup과 selectionchange 이벤트 - .pline 영역에서도 동작하도록
+    // 🔧 .pcontent를 contenteditable로 만들어 텍스트 선택/서식 지원
+    function ensurePcontentEditable(el) {
+      const pcontent = el?.closest?.('.pcontent');
+      if (pcontent && pcontent.getAttribute('contenteditable') !== 'true') {
+        pcontent.setAttribute('contenteditable', 'true');
+      }
+    }
+    
+    document.addEventListener('mouseup', (e)=> {
+      const target = e.target;
+      const inTree = target.closest?.('#tree');
+      if (!inTree) return;
+      
+      // .pline 또는 .pcontent 내부에서 선택
+      const inPline = target.closest?.('.pline');
+      const inPcontent = target.closest?.('.pcontent');
+      
+      if (inPline || inPcontent) {
+        ensurePcontentEditable(target);
+        setTimeout(showBarMaybe, 10);
+      }
+    });
+    
+    document.addEventListener('selectionchange', ()=> {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+      
+      const n = sel.getRangeAt(0).commonAncestorContainer;
+      const el = (n.nodeType === 1 ? n : n.parentElement);
+      const inTree = el?.closest?.('#tree');
+      if (!inTree) return;
+      
+      const inPline = el?.closest?.('.pline');
+      const inPcontent = el?.closest?.('.pcontent');
+      
+      if (inPline || inPcontent) {
+        ensurePcontentEditable(el);
+        setTimeout(showBarMaybe, 10);
+      }
+    });
     window.addEventListener('scroll', hide, {passive:true});
     window.addEventListener('resize', hide);
+    
+    // 🔧 단락(details.para) 열릴 때 .pcontent를 contenteditable로 만들기
+    document.addEventListener('toggle', (e) => {
+      const details = e.target;
+      if (!details.matches?.('details.para')) return;
+      if (details.open) {
+        const pcontent = details.querySelector('.pcontent');
+        if (pcontent) {
+          pcontent.setAttribute('contenteditable', 'true');
+        }
+      }
+    }, true);
 
     let isSavingLine = false; // 무한 루프 방지 플래그
     function saveCurrentLine(){
@@ -781,7 +975,14 @@
       }
       isSavingLine = true;
       try {
-        WBP_FMT.saveLine(line);
+        // 🔧 .pcontent인 경우 내부의 모든 .pline 저장
+        if (line.classList?.contains('pcontent')) {
+          line.querySelectorAll('.pline').forEach(pline => {
+            WBP_FMT.saveLine(pline);
+          });
+        } else {
+          WBP_FMT.saveLine(line);
+        }
       } finally {
         // 다음 이벤트 루프에서 플래그 해제
         setTimeout(() => { isSavingLine = false; }, 0);
@@ -823,26 +1024,22 @@
       const STORAGE_COMMENTARY_KEY = (typeof STORAGE_COMMENTARY !== 'undefined') ? STORAGE_COMMENTARY : 'wbps.ctx.comm.v1';
       const STORAGE_SUMMARY_KEY = (typeof STORAGE_SUMMARY !== 'undefined') ? STORAGE_SUMMARY : 'wbps.ctx.summary.v1';
 
-      const sermonMap = safe(()=>{
-        if (typeof loadState === 'function') return loadState(STORAGE_SERMON_KEY, {});
-        return JSON.parse(localStorage.getItem(STORAGE_SERMON_KEY)||'{}');
-      },{});
-      const unitMap   = safe(()=>{
-        if (typeof loadState === 'function') return loadState(STORAGE_UNIT_CTX_KEY, {});
-        return JSON.parse(localStorage.getItem(STORAGE_UNIT_CTX_KEY)||'{}');
-      },{});
-      const wholeMap  = safe(()=>{
-        if (typeof loadState === 'function') return loadState(STORAGE_WHOLE_CTX_KEY, {});
-        return JSON.parse(localStorage.getItem(STORAGE_WHOLE_CTX_KEY)||'{}');
-      },{});
-      const commMap   = safe(()=>{
-        if (typeof loadState === 'function') return loadState(STORAGE_COMMENTARY_KEY, {});
-        return JSON.parse(localStorage.getItem(STORAGE_COMMENTARY_KEY)||'{}');
-      },{});
-      const sumMap    = safe(()=>{
-        if (typeof loadState === 'function') return loadState(STORAGE_SUMMARY_KEY, {});
-        return JSON.parse(localStorage.getItem(STORAGE_SUMMARY_KEY)||'{}');
-      },{});
+      // localStorage에서 직접 데이터 로드 (app.js saveState 형식 호환)
+      function loadFromStorage(key) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          // app.js의 saveState 형식: { data: ..., _version: ... } 형태일 수 있음
+          return (parsed && typeof parsed === 'object' && parsed.data) ? parsed.data : (parsed || {});
+        } catch { return {}; }
+      }
+      
+      const sermonMap = safe(()=> loadFromStorage(STORAGE_SERMON_KEY), {});
+      const unitMap   = safe(()=> loadFromStorage(STORAGE_UNIT_CTX_KEY), {});
+      const wholeMap  = safe(()=> loadFromStorage(STORAGE_WHOLE_CTX_KEY), {});
+      const commMap   = safe(()=> loadFromStorage(STORAGE_COMMENTARY_KEY), {});
+      const sumMap    = safe(()=> loadFromStorage(STORAGE_SUMMARY_KEY), {});
 
       const tb = paraEl.querySelector('.ptoolbar'); if(!tb) return;
       const q = s=>tb.querySelector(s);
@@ -925,12 +1122,8 @@
         for(let i=0;i<localStorage.length;i++){
           const k = localStorage.key(i);
           if(!isOurKey(k)) continue;
-          if (typeof loadState === 'function') {
-            out[k] = loadState(k, null);
-          } else {
-            const raw = localStorage.getItem(k);
-            try{ out[k] = JSON.parse(raw); } catch{ out[k] = raw; }
-          }
+          const raw = localStorage.getItem(k);
+          try{ out[k] = JSON.parse(raw); } catch{ out[k] = raw; }
         }
         return out;
       }
@@ -982,11 +1175,7 @@
         let count = 0;
         for(const [k,v] of Object.entries(bag)){
           if(!k) continue;
-          if (typeof saveState === 'function') {
-            saveState(k, v);
-          } else {
-            localStorage.setItem(k, typeof v==='string' ? v : JSON.stringify(v));
-          }
+          localStorage.setItem(k, typeof v==='string' ? v : JSON.stringify(v));
           count++;
         }
         alert(`가져오기 완료: ${count}개 항목을 복원했습니다.`);

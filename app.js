@@ -841,6 +841,20 @@ function updateButtonColors(){
       }
     }
     
+    const btnExportSermons = document.getElementById('btnExportSermons');
+    if (btnExportSermons) {
+      const hasSermons = hasSermonContent();
+      if (hasSermons) {
+        btnExportSermons.style.background = 'linear-gradient(180deg, #6ea8fe 78%, #5a8fe0 72%)';
+        btnExportSermons.style.borderColor = '#5a8fe0';
+        btnExportSermons.style.color = '#fff';
+      } else {
+        btnExportSermons.style.background = '';
+        btnExportSermons.style.borderColor = '';
+        btnExportSermons.style.color = '';
+      }
+    }
+    
     // 2. 서식내보내기 버튼 - 저장된 서식이 있는지 확인
     const btnFmtExport = document.getElementById('btnFmtExport');
     if (btnFmtExport) {
@@ -898,6 +912,18 @@ function hasStoredContent(){
     return false;
   } catch (e) {
     console.error('[hasStoredContent] 오류:', e);
+    return false;
+  }
+}
+
+function hasSermonContent(){
+  try {
+    const data = loadState(STORAGE_SERMON, {});
+    if (!data || typeof data !== 'object') return false;
+    const entries = Object.values(data);
+    return entries.some(val => Array.isArray(val) ? val.length > 0 : !!val);
+  } catch (e) {
+    console.error('[hasSermonContent] 오류:', e);
     return false;
   }
 }
@@ -1219,144 +1245,6 @@ const STORAGE_BOOK_STRUCT  = 'WBP3_BOOK_STRUCT';
 const STORAGE_BOOK_SUMMARY = 'WBP3_BOOK_SUMMARY';
 const FMT_NS = 'WBP3_FMT';  // 서식 네임스페이스 (validateState에서 사용)
 
-// ===== [IndexedDB: STORAGE_* 전용] =====
-const IDB_DB_NAME = 'WBP3_STORAGE';
-const IDB_STORE_NAME = 'kv';
-const IDB_VERSION = 1;
-const IDB_MIGRATION_KEY = '__wbp_idb_migrated__';
-
-const IDB_KEYS = [
-  STORAGE_SERMON,
-  STORAGE_LAST_SERMON_PARA,
-  STORAGE_UNIT_CTX,
-  STORAGE_WHOLE_CTX,
-  STORAGE_COMMENTARY,
-  STORAGE_SUMMARY,
-  STORAGE_BOOK_BASIC,
-  STORAGE_BOOK_STRUCT,
-  STORAGE_BOOK_SUMMARY
-];
-
-const _idbSupported = typeof indexedDB !== 'undefined';
-let _idbPromise = null;
-let _idbReady = false;
-let _idbInitPromise = null;
-const _idbCache = new Map();
-const _idbPending = new Map();
-
-function _isIdbKey(key){
-  return IDB_KEYS.includes(key);
-}
-
-function _openIdb(){
-  if (!_idbSupported) return Promise.resolve(null);
-  if (_idbPromise) return _idbPromise;
-  _idbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_DB_NAME, IDB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
-        db.createObjectStore(IDB_STORE_NAME, { keyPath: 'key' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error || new Error('indexedDB open failed'));
-  });
-  return _idbPromise;
-}
-
-function _idbGet(key){
-  return _openIdb().then(db => {
-    if (!db) return null;
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE_NAME, 'readonly');
-      const store = tx.objectStore(IDB_STORE_NAME);
-      const req = store.get(key);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error);
-    });
-  });
-}
-
-function _idbPut(key, value){
-  return _openIdb().then(db => {
-    if (!db) return false;
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
-      const store = tx.objectStore(IDB_STORE_NAME);
-      const req = store.put({ key, value });
-      req.onsuccess = () => resolve(true);
-      req.onerror = () => reject(req.error);
-    });
-  });
-}
-
-function _idbDelete(key){
-  return _openIdb().then(db => {
-    if (!db) return false;
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE_NAME, 'readwrite');
-      const store = tx.objectStore(IDB_STORE_NAME);
-      const req = store.delete(key);
-      req.onsuccess = () => resolve(true);
-      req.onerror = () => reject(req.error);
-    });
-  });
-}
-
-function _idbGetValue(key){
-  return _idbGet(key).then(rec => (rec ? rec.value : null));
-}
-
-async function _migrateLocalStorageToIdb(){
-  if (!_idbSupported) return false;
-  try{
-    const migrated = await _idbGetValue(IDB_MIGRATION_KEY);
-    if (migrated) return true;
-    for (const key of IDB_KEYS) {
-      const raw = localStorage.getItem(key);
-      if (raw !== null) {
-        await _idbPut(key, raw);
-        localStorage.removeItem(key);
-      }
-    }
-    await _idbPut(IDB_MIGRATION_KEY, String(Date.now()));
-    return true;
-  } catch (e){
-    console.warn('[IDB] migration failed:', e);
-    return false;
-  }
-}
-
-function _primeIdbCache(){
-  if (!_idbSupported) return Promise.resolve(false);
-  if (_idbInitPromise) return _idbInitPromise;
-  _idbInitPromise = (async () => {
-    try{
-      await _migrateLocalStorageToIdb();
-      for (const key of IDB_KEYS) {
-        const rec = await _idbGet(key);
-        if (rec && typeof rec.value !== 'undefined') _idbCache.set(key, rec.value);
-      }
-      _idbReady = true;
-      for (const [k, v] of _idbPending.entries()) {
-        try { await _idbPut(k, v); } catch(_) {}
-      }
-      _idbPending.clear();
-      return true;
-    } catch (e){
-      console.warn('[IDB] init failed, fallback to localStorage:', e);
-      _idbReady = false;
-      return false;
-    }
-  })();
-  return _idbInitPromise;
-}
-
-if (_idbSupported) {
-  _primeIdbCache();
-}
-
 // ===== [통합 저장 시스템 v4] =====
 const STORAGE_VERSION = 4;
 const STORAGE_SCHEMA_PREFIX = 'wbps.v4';
@@ -1417,13 +1305,7 @@ function backupState(key, value) {
       timestamp: Date.now(),
       data: deepCopy(value)
     };
-    const serialized = JSON.stringify(backupData);
-    if (_isIdbKey(key) && _idbSupported) {
-      if (_idbReady) _idbPut(backupKey, serialized).catch(() => {});
-      else _idbPending.set(backupKey, serialized);
-    } else {
-      localStorage.setItem(backupKey, serialized);
-    }
+    localStorage.setItem(backupKey, JSON.stringify(backupData));
     console.warn('[backupState] Backup created:', backupKey);
     return backupKey;
   } catch (e) {
@@ -1533,18 +1415,8 @@ function saveState(key, value, options = {}) {
       ? finalValue 
       : JSON.stringify(finalValue);
     
-    // 저장 시도 (STORAGE_*는 IndexedDB 우선)
-    if (_isIdbKey(key) && _idbSupported) {
-      _idbCache.set(key, serialized);
-      if (_idbReady) {
-        _idbPut(key, serialized).catch(e => console.warn('[IDB] save failed:', e));
-      } else {
-        _idbPending.set(key, serialized);
-        _primeIdbCache();
-      }
-    } else {
-      localStorage.setItem(key, serialized);
-    }
+    // 저장 시도
+    localStorage.setItem(key, serialized);
     
     // 버튼 색상 업데이트 (내용 또는 서식 관련 키인 경우)
     if (key === STORAGE_SERMON || key === STORAGE_UNIT_CTX || key === STORAGE_WHOLE_CTX || 
@@ -1567,26 +1439,6 @@ function saveState(key, value, options = {}) {
     console.error('[saveState] Save failed:', e);
     // 저장 실패 시 백업 생성
     backupState(key, value);
-    return false;
-  }
-}
-
-function removeState(key){
-  try{
-    if (_isIdbKey(key) && _idbSupported) {
-      _idbCache.delete(key);
-      _idbPending.delete(key);
-      if (_idbReady) {
-        _idbDelete(key).catch(e => console.warn('[IDB] delete failed:', e));
-      } else {
-        _primeIdbCache();
-      }
-    } else {
-      localStorage.removeItem(key);
-    }
-    return true;
-  } catch (e){
-    console.warn('[removeState] failed:', e);
     return false;
   }
 }
@@ -1643,64 +1495,10 @@ function debounceSave(key, value, delay = DEFAULT_SAVE_DELAY) {
   }, { capture: true });
 })();
 
-// ===== 자동 서식·내용 저장 =====
-let _fmtAutosaveTimer = null;
-function scheduleFormatAutosave(){
-  clearTimeout(_fmtAutosaveTimer);
-  _fmtAutosaveTimer = setTimeout(()=>{
-    try{ saveFormatForOpenPara(); }
-    catch(e){ console.warn('자동 서식/내용 저장 실패:', e); }
-  }, 600);
-}
-function bindFormatAutosave(){
-  document.querySelectorAll('.pcontent').forEach(pc=>{
-    if (pc.dataset.fmtAutosaveBound === '1') return;
-    pc.dataset.fmtAutosaveBound = '1';
-    pc.addEventListener('input', scheduleFormatAutosave);
-    pc.addEventListener('blur', scheduleFormatAutosave);
-  });
-}
-document.addEventListener('wbp:treeBuilt', ()=> setTimeout(bindFormatAutosave, 120));
-
-// ===== 시작 시 자동 듣기 =====
-let _autoReadStarted = false;
-function autoStartInlineReading(){
-  if (_autoReadStarted) return;
-  const para = document.querySelector('details.para[open]') || document.querySelector('#tree details.book details.para');
-  if (!para) return;
-  if (!para.hasAttribute('open')) para.open = true;
-  const t = para.querySelector('summary .ptitle');
-  const btn = para.querySelector('.speakBtn');
-  if (!t || !btn) return;
-  const book = t.dataset.book;
-  const chap = parseInt(t.dataset.ch, 10);
-  const idx  = parseInt(t.dataset.idx, 10);
-  if (!book || Number.isNaN(chap) || Number.isNaN(idx)) return;
-  _autoReadStarted = true;
-  CURRENT.book = book; CURRENT.chap = chap; CURRENT.paraIdx = idx;
-  toggleSpeakInline(book, chap, idx, para, btn);
-}
-document.addEventListener('wbp:treeBuilt', ()=> setTimeout(autoStartInlineReading, 400));
-
 // 통합 로딩 함수
 function loadState(key, defaultValue = null, options = {}) {
   try {
-    let raw = null;
-    if (_isIdbKey(key) && _idbSupported) {
-      if (_idbCache.has(key)) {
-        raw = _idbCache.get(key);
-      } else {
-        if (_idbReady) {
-          _idbGet(key).then(rec => {
-            if (rec && typeof rec.value !== 'undefined') _idbCache.set(key, rec.value);
-          }).catch(() => {});
-        } else {
-          _primeIdbCache();
-        }
-      }
-    } else {
-      raw = localStorage.getItem(key);
-    }
+    const raw = localStorage.getItem(key);
     if (raw === null) {
       return defaultValue;
     }
@@ -1751,124 +1549,11 @@ function loadState(key, defaultValue = null, options = {}) {
 })();
 // ===== [통합 저장 시스템 v4] END =====
 
-function syncSermonEditorForExport(){
-  try{
-    if (!sermonEditor || sermonEditor.style.display === 'none') return;
-
-    const rawTitle = (sermonTitle?.value || '').trim();
-    const title = rawTitle || '(제목 없음)';
-    let body = getBodyHTML ? (getBodyHTML() || '') : '';
-    body = body.replace(/^\s+|\s+$/g, '');
-
-    const now = new Date();
-    const date = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    const imgs = [];
-
-    const ctxType = sermonEditor.dataset?.ctxType || '';
-    if (ctxType) {
-      if (ctxType.startsWith('book-')) {
-        const bookName = sermonEditor.dataset.bookName;
-        if (!bookName) return;
-        const storeKey =
-          ctxType === 'book-basic'  ? STORAGE_BOOK_BASIC  :
-          ctxType === 'book-struct' ? STORAGE_BOOK_STRUCT :
-                                      STORAGE_BOOK_SUMMARY;
-        const map = getDocMap(storeKey);
-        map[bookName] = { title, body, images: imgs, date };
-        setDocMap(storeKey, map);
-        return;
-      }
-
-      if (!CURRENT.book || !Number.isFinite(CURRENT.chap) || !Number.isFinite(CURRENT.paraIdx)) {
-        if (!syncCurrentFromOpen()) return;
-      }
-      const para = BIBLE?.books?.[CURRENT.book]?.[CURRENT.chap]?.paras?.[CURRENT.paraIdx];
-      if (!para) return;
-      const pid = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
-
-      const key =
-        ctxType === 'unit'       ? STORAGE_UNIT_CTX :
-        ctxType === 'whole'      ? STORAGE_WHOLE_CTX :
-        ctxType === 'commentary' ? STORAGE_COMMENTARY :
-                                   STORAGE_SUMMARY;
-
-      const map = getDocMap(key);
-      map[pid] = { title, body, images: imgs, date };
-      setDocMap(key, map);
-      return;
-    }
-
-    if (!CURRENT.paraId) {
-      if (!syncCurrentFromOpen()) return;
-      const para = BIBLE?.books?.[CURRENT.book]?.[CURRENT.chap]?.paras?.[CURRENT.paraIdx];
-      if (!para) return;
-      CURRENT.paraId = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
-    }
-
-    const map = getSermonMap();
-    const arr = map[CURRENT.paraId] || [];
-    const editing = sermonEditor.dataset?.editing ?? '';
-
-    let focus = '';
-    let keywords = '';
-    let target = '';
-    if (editing !== '' && CURRENT.paraId) {
-      const i = +editing;
-      const existing = arr[i];
-      if (existing) {
-        focus = existing.focus || '';
-        keywords = existing.keywords || '';
-        target = existing.target || '';
-      }
-    }
-
-    const focusEl = document.getElementById('sermonFocus');
-    const keywordsEl = document.getElementById('sermonKeywords');
-    const targetEl = document.getElementById('sermonTarget');
-    if (focusEl && focusEl.offsetParent !== null) focus = (focusEl.value || '').trim();
-    if (keywordsEl && keywordsEl.offsetParent !== null) keywords = (keywordsEl.value || '').trim();
-    if (targetEl && targetEl.offsetParent !== null) target = (targetEl.value || '').trim();
-
-    const hasBodyText = body.replace(/<[^>]*>/g, '').trim();
-    const hasContent = rawTitle || hasBodyText || focus || keywords || target;
-    if (editing === '' && !hasContent) return;
-
-    if (editing !== '' && arr[+editing]) {
-      const i = +editing;
-      arr[i] = { ...arr[i], title, body, images: imgs, date, focus, keywords, target };
-    } else {
-      arr.unshift({
-        id: safeRandomId(),
-        title,
-        body,
-        images: imgs,
-        date,
-        link: '',
-        focus,
-        keywords,
-        target
-      });
-    }
-
-    map[CURRENT.paraId] = arr;
-    setSermonMap(map, true);
-  } catch(e){
-    console.warn('[syncSermonEditorForExport] failed:', e);
-  }
-}
-
 function todayStr(){
   const d=new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
-function safeRandomId(){
-  try{
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  }catch(_){}
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
 function exportAllData(){
-  syncSermonEditorForExport();
   const keys = [STORAGE_SERMON, STORAGE_UNIT_CTX, STORAGE_WHOLE_CTX, STORAGE_COMMENTARY, STORAGE_SUMMARY, VOICE_CHOICE_KEY];
   const payload = { __wbps:1, date: todayStr(), items:{} };
   keys.forEach(k=> payload.items[k] = loadState(k, null));
@@ -1889,7 +1574,7 @@ async function importAllData(file){
     if(!json || json.__wbps!==1 || !json.items){ alert('백업 파일 형식이 아닙니다.'); return; }
     if(!confirm('이 백업으로 현재 기기의 데이터를 덮어쓸까요?')) return;
     Object.entries(json.items).forEach(([k,v])=>{
-      if(v===null || v===undefined) removeState(k);
+      if(v===null || v===undefined) localStorage.removeItem(k);
       else saveState(k, v);
     });
     status('가져오기가 완료되었습니다. 페이지를 새로고침하면 반영됩니다.');
@@ -1899,187 +1584,43 @@ async function importAllData(file){
   }
 }
 
-const SERMON_BOOK_IMPORT_INPUT_ID = 'sermonBookImportInput';
-const SERMON_BOOK_CTRL_ID = 'sermonBookControls';
-
-function collectSermonsForBook(bookName){
-  if(!bookName) return {};
-  const map = getSermonMap();
-  const matched = {};
-  Object.entries(map).forEach(([pid, arr])=>{
-    if(pid.startsWith(`${bookName}|`)){
-      matched[pid] = arr;
-    }
-  });
-  return matched;
-}
-
-function exportSermonsForBook(bookName){
-  if(!bookName){
-    alert('책을 선택한 뒤 내보내기를 실행하세요.');
-    return;
-  }
-  const sermons = collectSermonsForBook(bookName);
-  const keys = Object.keys(sermons);
-  if(!keys.length){
-    alert(`${bookName}에 저장된 설교가 없습니다.`);
-    return;
-  }
+function exportSermons(){
+  const data = loadState(STORAGE_SERMON, {});
   const payload = {
-    type: 'wbps-sermon-book',
-    book: bookName,
+    type: 'wbps-sermons',
     exportedAt: new Date().toISOString(),
-    count: keys.length,
-    items: sermons
+    data
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
-  const sanitized = bookName.replace(/\s+/g,'_');
   const ts = new Date();
   const stamp = `${ts.getFullYear()}${String(ts.getMonth()+1).padStart(2,'0')}${String(ts.getDate()).padStart(2,'0')}-${String(ts.getHours()).padStart(2,'0')}${String(ts.getMinutes()).padStart(2,'0')}`;
   a.href = URL.createObjectURL(blob);
-  a.download = `wbps-sermons-${sanitized}-${stamp}.json`;
-  document.body.appendChild(a); a.click();
+  a.download = `wbps-sermons-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
   setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
-  status(`${bookName} 설교 ${keys.length}개 내보내기 완료`);
+  status('설교 데이터를 내보냈습니다.');
 }
 
-function applySermonsForBook(bookName, items){
-  if(!bookName || !items || typeof items !== 'object') return 0;
-  const map = getSermonMap();
-  let applied = 0;
-  Object.entries(items).forEach(([pid, arr])=>{
-    if(!pid.startsWith(`${bookName}|`)) return;
-    map[pid] = Array.isArray(arr) ? arr : [];
-    applied++;
-  });
-  if(applied){
-    setSermonMap(map, true);
-  }
-  return applied;
-}
-
-function handleSermonBookImport(file, selectedBook){
-  const reader = new FileReader();
-  reader.onload = () => {
-    try{
-      const json = JSON.parse(String(reader.result||'{}'));
-      const items = json.items || json.sermons || json.data || null;
-      const bookFromFile = json.book || json.targetBook || selectedBook;
-      const bookName = selectedBook || bookFromFile;
-      if(!items || typeof items !== 'object'){
-        alert('설교 데이터가 없습니다. 올바른 파일을 선택했는지 확인하세요.');
-        return;
-      }
-      if(!bookName){
-        alert('가져올 책을 먼저 선택하세요.');
-        return;
-      }
-      const candidates = Object.keys(items).filter(pid=>pid.startsWith(`${bookName}|`));
-      if(!candidates.length){
-        alert(`${bookName} 관련 설교가 파일에 없습니다.`);
-        return;
-      }
-      if(!confirm(`"${bookName}" 설교 ${candidates.length}개를 가져옵니다. 동일 ID는 덮어쓰기 됩니다. 계속할까요?`)) return;
-      const applied = applySermonsForBook(bookName, items);
-      status(`${bookName} 설교 ${applied}개 가져오기 완료`);
-      alert(`설교 가져오기 완료: ${bookName} (${applied}개 적용)`);
-    }catch(e){
-      console.error(e);
-      alert('설교 가져오기 중 오류가 발생했습니다. JSON 형식을 확인하세요.');
+async function importSermons(file){
+  try{
+    const text = await file.text();
+    const json = JSON.parse(text);
+    const bag = json?.data ?? json;
+    if(!bag || typeof bag !== 'object'){
+      alert('설교 백업 형식이 아닙니다.');
+      return;
     }
-  };
-  reader.readAsText(file);
-}
-
-function refreshSermonBookSelect(select){
-  if(!select) return;
-  select.innerHTML = '';
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = '-- 책 선택 --';
-  select.appendChild(placeholder);
-  if(BIBLE && BIBLE.books){
-    Object.keys(BIBLE.books).forEach(book=>{
-      const opt = document.createElement('option');
-      opt.value = book;
-      opt.textContent = book;
-      select.appendChild(opt);
-    });
-  }
-  const openBook = document.querySelector('details.book[open] summary .btitle');
-  if(openBook && openBook.dataset.book){
-    select.value = openBook.dataset.book;
-  } else if(select.options.length > 1){
-    select.selectedIndex = 1;
+    if(!confirm('설교 데이터를 덮어쓰시겠습니까?')) return;
+    saveState(STORAGE_SERMON, bag);
+    status('설교 데이터를 가져왔습니다.');
+    renderSermonList();
+  }catch(e){
+    console.error(e);
+    alert('설교 가져오기 중 오류가 발생했습니다.');
   }
 }
-
-function ensureBookSermonControls(){
-  const doc = document;
-  if(doc.getElementById(SERMON_BOOK_CTRL_ID)) return;
-  const anchor =
-    doc.getElementById('btnFmtImport') ||
-    doc.getElementById('btnImportAll') ||
-    doc.querySelector('header');
-  if(!anchor) return;
-  const wrap = doc.createElement('div');
-  wrap.id = SERMON_BOOK_CTRL_ID;
-  wrap.style.cssText = 'display:flex;align-items:center;gap:4px;margin-left:6px;';
-  const select = doc.createElement('select');
-  select.id = 'sermonBookSelect';
-  select.style.cssText = 'background:var(--panel,#161922);color:var(--text,#e6e8ef);border:1px solid var(--border,#252a36);border-radius:6px;padding:4px 8px;font-size:12px;';
-  refreshSermonBookSelect(select);
-  const btnExp = doc.createElement('button');
-  btnExp.id = 'btnSermonBookExport';
-  btnExp.type = 'button';
-  btnExp.textContent = '설교내보내기';
-  btnExp.className = 'sermon-book-btn';
-  const btnImp = doc.createElement('button');
-  btnImp.id = 'btnSermonBookImport';
-  btnImp.type = 'button';
-  btnImp.textContent = '설교가져오기';
-  btnImp.className = 'sermon-book-btn';
-  wrap.append(select, btnExp, btnImp);
-  const importBtn = doc.getElementById('btnImportAll');
-  if (importBtn && importBtn.parentElement) {
-    importBtn.insertAdjacentElement('afterend', wrap);
-  } else if (anchor.tagName === 'HEADER'){
-    anchor.appendChild(wrap);
-  } else {
-    anchor.insertAdjacentElement('afterend', wrap);
-  }
-
-  btnExp.addEventListener('click', ()=>{
-    const book = select.value || select.options[select.selectedIndex]?.value;
-    exportSermonsForBook(book);
-  });
-  btnImp.addEventListener('click', ()=>{
-    const book = select.value || select.options[select.selectedIndex]?.value;
-    const input = doc.getElementById(SERMON_BOOK_IMPORT_INPUT_ID);
-    if(input){
-      input.dataset.targetBook = book || '';
-      input.click();
-    }
-  });
-
-  const fileInput = doc.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = 'application/json,.json';
-  fileInput.id = SERMON_BOOK_IMPORT_INPUT_ID;
-  fileInput.style.display = 'none';
-  fileInput.addEventListener('change', (e)=>{
-    const file = e.target.files?.[0];
-    if(!file) return;
-    const book = e.target.dataset.targetBook || select.value || select.options[select.selectedIndex]?.value;
-    handleSermonBookImport(file, book);
-    e.target.value = '';
-    delete e.target.dataset.targetBook;
-  });
-  doc.body.appendChild(fileInput);
-}
-
-document.addEventListener('wbp:treeBuilt', ensureBookSermonControls);
 
 /* --------- Refs / State --------- */
 const voiceSelect = el('voiceSelect'), testVoiceBtn = el('testVoice');
@@ -2094,7 +1635,6 @@ let BIBLE = null;
 let CURRENT = { book:null, chap:null, paraIdx:null, paraId:null };
 let READER = { playing:false, q:[], idx:0, synth:window.speechSynthesis||null, scope:null, btn:null, continuous:false };
 let EDITOR_READER = { playing:false, u:null, synth:window.speechSynthesis||null };
-let PRACTICE = { active:false, rec:null, currentLine:null, counts:new WeakMap(), btn:null };
 
 /* --------- Boot --------- */
 (async function boot(){
@@ -2136,11 +1676,35 @@ let PRACTICE = { active:false, rec:null, currentLine:null, counts:new WeakMap(),
   const btnExport = el('btnExportAll');
   const btnImport = el('btnImportAll');
   const fileInput = el('importFile');
+  const btnExportSermons = el('btnExportSermons');
+  const btnImportSermons = el('btnImportSermons');
+  let sermonFileInput = el('sermonImportFile');
+
+  if (!sermonFileInput) {
+    sermonFileInput = document.createElement('input');
+    sermonFileInput.type = 'file';
+    sermonFileInput.accept = 'application/json';
+    sermonFileInput.id = 'sermonImportFile';
+    sermonFileInput.style.display = 'none';
+    document.body.appendChild(sermonFileInput);
+  }
+
   if (btnExport) btnExport.onclick = exportAllData;
   if (btnImport) btnImport.onclick = ()=> fileInput && fileInput.click();
   if (fileInput) fileInput.addEventListener('change', (e)=>{
     const f = e.target.files?.[0]; if(!f) return;
     importAllData(f).finally(()=>{ e.target.value=''; });
+  });
+  if (btnExportSermons) btnExportSermons.onclick = exportSermons;
+  if (btnImportSermons) {
+    btnImportSermons.addEventListener('click', (e)=>{
+      e.preventDefault();
+      sermonFileInput?.click();
+    });
+  }
+  sermonFileInput?.addEventListener('change', (e)=>{
+    const f = e.target.files?.[0]; if(!f) return;
+    importSermons(f).finally(()=>{ e.target.value=''; });
   });
 })();
 
@@ -2337,9 +1901,8 @@ function buildTree(){
         body.className = 'pbody';
         body.innerHTML = `
           <div class="ptoolbar">
-            <button class="primary speakBtn">듣기</button>
-            <button class="practiceBtn">읽기</button>
-            <label class="chip"><input type="checkbox" class="keepReading" style="margin-right:6px">계속 듣기</label>
+            <button class="primary speakBtn">낭독</button>
+            <label class="chip"><input type="checkbox" class="keepReading" style="margin-right:6px">계속 낭독</label>
             <button class="ctxBtn btnSummary">내용흐름</button>
             <button class="ctxBtn btnUnitCtx">단위성경속 맥락</button>
             <button class="ctxBtn btnWholeCtx">전체성경속 맥락</button>
@@ -2401,10 +1964,6 @@ function buildTree(){
 
         body.querySelector('.speakBtn').addEventListener('click', ()=>{
           toggleSpeakInline(bookName, chap, idx, detPara, body.querySelector('.speakBtn'));
-        });
-        const practiceBtn = body.querySelector('.practiceBtn');
-        practiceBtn?.addEventListener('click', ()=>{
-          togglePracticeFromToolbar(detPara, practiceBtn);
         });
 
         // 컨텍스트 에디터 버튼들
@@ -2717,152 +2276,6 @@ function highlightSentenceInLine(line, sentenceIndex, sentences) {
   }
 }
 
-/* --------- Reading Practice (STT) --------- */
-function normalizePracticeText(text){
-  return String(text||'')
-    .replace(/[\s.,!?"'“”‘’;:·…~\-]/g,'')
-    .toLowerCase();
-}
-function getLinePlainForPractice(lineEl){
-  if(!lineEl) return '';
-  const clone = lineEl.cloneNode(true);
-  clone.querySelectorAll('sup').forEach(n=> n.remove());
-  return normalizePracticeText(clone.textContent || '');
-}
-function getLineFromSelection(){
-  const sel = window.getSelection();
-  if(!sel || !sel.focusNode) return null;
-  const node = sel.focusNode.nodeType === 1 ? sel.focusNode : sel.focusNode.parentElement;
-  return node?.closest?.('.pline') || null;
-}
-function shadePracticeLine(lineEl, count){
-  if(!lineEl) return;
-  const alpha = Math.min(0.18 + count * 0.12, 0.82);
-  lineEl.style.background = `rgba(80, 150, 255, ${alpha.toFixed(2)})`;
-  lineEl.dataset.practiceCount = String(count);
-  lineEl.classList.add('practice-hit');
-}
-function markPracticeCurrent(lineEl){
-  document.querySelectorAll('.practice-current').forEach(el=> el.classList.remove('practice-current'));
-  if(lineEl){
-    lineEl.classList.add('practice-current');
-    lineEl.scrollIntoView({block:'center', behavior:'smooth'});
-  }
-}
-function moveToNextPracticeLine(currentLine){
-  const all = Array.from(document.querySelectorAll('.pline'));
-  const idx = all.indexOf(currentLine);
-  if(idx >= 0 && idx < all.length - 1){
-    const next = all[idx + 1];
-    const para = next.closest('details.para');
-    if(para) para.open = true;
-    PRACTICE.currentLine = next;
-    markPracticeCurrent(next);
-    // 커서도 옮겨서 다음 절을 바로 읽을 수 있게 함
-    try{
-      const sel = window.getSelection();
-      const r = document.createRange();
-      r.selectNodeContents(next);
-      r.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(r);
-    }catch(_){}
-  }else{
-    stopPractice(true);
-  }
-}
-function handlePracticeResult(recText){
-  if(!PRACTICE.active || !PRACTICE.currentLine) return;
-  const target = getLinePlainForPractice(PRACTICE.currentLine);
-  const spoken = normalizePracticeText(recText);
-  if(!spoken || spoken.length < 3) return;
-
-  let score = 0;
-  const len = Math.min(target.length, spoken.length);
-  for(let i=0;i<len;i++){ if(target[i] === spoken[i]) score++; }
-  const ratio = Math.max(
-    target && spoken && (target.includes(spoken) || spoken.includes(target)) ? (Math.min(target.length, spoken.length) / Math.max(target.length, spoken.length)) : 0,
-    score / Math.max(target.length, spoken.length, 1)
-  );
-  if(ratio < 0.6) return;
-
-  const prev = PRACTICE.counts.get(PRACTICE.currentLine) || 0;
-  const nextCount = prev + 1;
-  PRACTICE.counts.set(PRACTICE.currentLine, nextCount);
-  shadePracticeLine(PRACTICE.currentLine, nextCount);
-  moveToNextPracticeLine(PRACTICE.currentLine);
-}
-function startPractice(startLine){
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ alert('이 브라우저는 음성 인식을 지원하지 않습니다.'); return; }
-  if(PRACTICE.active) stopPractice(true);
-
-  const line = startLine || getLineFromSelection() || document.querySelector('details.para[open] .pline');
-  if(!line){ alert('커서가 있는 절을 찾을 수 없습니다. 절을 클릭한 뒤 다시 시도해 주세요.'); return; }
-
-  PRACTICE.active = true;
-  PRACTICE.currentLine = line;
-  markPracticeCurrent(line);
-  const rec = new SR();
-  rec.lang = 'ko-KR';
-  rec.interimResults = true;
-  rec.continuous = true;
-
-  rec.onresult = (ev)=>{
-    const r = ev.results[ev.results.length - 1];
-    const txt = r[0]?.transcript || '';
-    if(r.isFinal) handlePracticeResult(txt);
-  };
-  rec.onerror = (e)=>{
-    if(e.error === 'no-speech' && PRACTICE.active){
-      setTimeout(()=>{ try{ rec.start(); }catch(_){ stopPractice(true); } }, 500);
-      return;
-    }
-    stopPractice(true);
-  };
-  rec.onend = ()=>{
-    if(PRACTICE.active){
-      try{ rec.start(); }catch(_){ stopPractice(true); }
-    }
-  };
-
-  PRACTICE.rec = rec;
-  PRACTICE.btn && (PRACTICE.btn.textContent = '중지');
-  try{
-    rec.start();
-  }catch(e){
-    console.warn('practice start error', e);
-    stopPractice(true);
-  }
-}
-function stopPractice(silent){
-  PRACTICE.active = false;
-  if(PRACTICE.rec){
-    try{ PRACTICE.rec.onend = null; PRACTICE.rec.stop(); }catch(_){}
-  }
-  PRACTICE.rec = null;
-  PRACTICE.currentLine = null;
-  document.querySelectorAll('.practice-current').forEach(el=> el.classList.remove('practice-current'));
-  if(PRACTICE.btn){
-    PRACTICE.btn.textContent = '읽기';
-    PRACTICE.btn = null;
-  }
-  if(!silent){ status && status('읽기가 종료되었습니다.'); }
-}
-function togglePracticeFromToolbar(paraEl, btn){
-  if(PRACTICE.active){
-    stopPractice();
-    return;
-  }
-  PRACTICE.btn = btn || null;
-  const caretLine = getLineFromSelection();
-  let startLine = caretLine;
-  if(!startLine || (paraEl && !paraEl.contains(startLine))){
-    startLine = paraEl?.querySelector?.('.pline') || document.querySelector('details.para[open] .pline');
-  }
-  startPractice(startLine);
-}
-
 function speakVerseItemInScope(item, scope, onend){
   if(!READER.synth) return;
   
@@ -2990,7 +2403,7 @@ function stopSpeakInline(){
   updateInlineSpeakBtn();
   READER.scope = null; READER.btn = null;
 }
-function updateInlineSpeakBtn(){ if(READER.btn) READER.btn.textContent = READER.playing ? '중지' : '듣기'; }
+function updateInlineSpeakBtn(){ if(READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독'; }
 
 function goToNextParagraphInline(book, chap, idx){
   const chObj = BIBLE.books[book][chap];
@@ -3010,7 +2423,7 @@ function goToNextParagraphInline(book, chap, idx){
 
   const paraEls = chapEl.querySelectorAll(':scope > .paras > details.para');
 
-  if (READER.btn) READER.btn.textContent = '듣기';
+  if (READER.btn) READER.btn.textContent = '낭독';
 
   if (idx < chObj.paras.length - 1){
     const nextEl = paraEls[idx + 1];
@@ -3022,7 +2435,7 @@ function goToNextParagraphInline(book, chap, idx){
       CURRENT.paraIdx = idx + 1;
       READER.scope = nextEl;
       READER.btn = nextEl.querySelector('.speakBtn');
-      if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '듣기';
+      if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독';
       return true;
     }
   }
@@ -3043,7 +2456,7 @@ function goToNextParagraphInline(book, chap, idx){
 
         READER.scope = nextParaEl;
         READER.btn = nextParaEl?.querySelector('.speakBtn') || null;
-        if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '듣기';
+        if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독';
         return true;
       }
     }
@@ -3068,7 +2481,7 @@ function goToNextParagraphInline(book, chap, idx){
 
         READER.scope = nextParaEl;
         READER.btn = nextParaEl.querySelector('.speakBtn');
-        if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '듣기';
+        if (READER.btn) READER.btn.textContent = READER.playing ? '중지' : '낭독';
         return true;
       }
     }
@@ -3932,7 +3345,7 @@ function openSermonInputModal(){
     // 파싱된 모든 설교 추가
     sermons.forEach(sermon => {
       if (sermon.title) {
-        const newId = safeRandomId();
+        const newId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random() + Math.random());
         arr.unshift({ 
           id: newId, 
           title: sermon.title, 
@@ -4271,7 +3684,7 @@ el('saveSermon').onclick = () => {
     }
   } else {
     arr.unshift({
-      id: safeRandomId(),
+      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       title,
       body,
       images: imgs,
@@ -4482,7 +3895,7 @@ function stopEditorSpeak(silent){
   EDITOR_TTS.idx = 0;
   
   if(!silent) status('설교 낭독을 중지했습니다.'); 
-  editorSpeakBtn.textContent = '듣기';
+  editorSpeakBtn.textContent = '낭독';
 }
 
 /* --------- Hotkeys --------- */
@@ -4744,7 +4157,7 @@ main { height:auto !important; overflow:visible !important; }
 <footer>
   <span class="muted" id="date"></span><div class="grow"></div>
   <button id="print">인쇄(A4)</button>
-  <button id="read" class="primary">듣기</button>
+  <button id="read" class="primary">낭독</button>
   <button id="stop">중지</button>
   <button class="danger" id="d">삭제</button>
   <button class="primary" id="s">저장</button>
@@ -4784,7 +4197,7 @@ main { height:auto !important; overflow:visible !important; }
           // 빈 설교를 실제 내용으로 교체
           arr2[0] = { id: newId, title: data.title, body: data.body, images: data.images || [], date, link: arr2[0].link || '' };
         } else {
-          newId = safeRandomId();
+          newId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
           // 배열이 idx보다 작으면 확장
           while (arr2.length <= idx) {
             arr2.push(null);
@@ -5447,7 +4860,7 @@ function initSermonPopup(win){
     clearSentenceHighlight();
     
     readPane.style.display = 'none';
-    readBtn.textContent = '듣기';
+    readBtn.textContent = '낭독';
   }
 
   readBtn.onclick = ()=>{
@@ -5988,7 +5401,7 @@ function createFloatingToolbar(options) {
 /* === 절문장 전용 서식 툴바 === */
 (function(){
   const bar = document.getElementById('vbar') || document.getElementById('wbp-plbar');
-  let color = document.getElementById('vcolor');
+  const color = document.getElementById('vcolor');
   const docEl = document.getElementById('doc');
 
   // ===== [INIT HOOK] BEGIN =====
@@ -6016,17 +5429,6 @@ function createFloatingToolbar(options) {
 
   const treeEl = document.getElementById('tree');
   if(!bar || !treeEl) return;
-
-  // 설교 편집기에서도 글자색 적용을 위한 컬러 입력 보강
-  if (!color) {
-    const colorInput = document.createElement('input');
-    colorInput.type = 'color';
-    colorInput.id = 'vcolor';
-    colorInput.title = '글자색';
-    colorInput.style.cssText = 'width:30px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,.12);padding:0;background:transparent;cursor:pointer;';
-    bar.appendChild(colorInput);
-    color = colorInput;
-  }
 
   // 🔍 디버깅 패널 생성 (전역 스코프)
   if (!window.__WBP_DEBUG_PANEL) {
@@ -6237,34 +5639,25 @@ function createFloatingToolbar(options) {
         const endInSermonBody = sermonBody.contains(endNode);
         const elInSermonBody = sermonBody.contains(el) || el === sermonBody;
         
-      if (startInSermonBody || endInSermonBody || elInSermonBody) {
-          // 모든 설교 편집기 모드에서 플로팅 툴바 허용
-          // - 일반 설교보기 편집기: ctxType 없음
+        if (startInSermonBody || endInSermonBody || elInSermonBody) {
+          // 모든 편집기 모드에서 플로팅 툴바 허용
           // - 책 단위: book-basic, book-struct, book-summary
           // - 단락 단위: summary, unit, whole, commentary
-          const ctxType = sermonEditor.dataset.ctxType || '';
-          if (!ctxType) {
-            if (DEBUG) {
-              console.log('[inVerse] ✅ #sermonBody 선택 허용 (설교보기)', {
-                startInSermonBody,
-                endInSermonBody,
-                elInSermonBody
-              });
+          const ctxType = sermonEditor.dataset.ctxType;
+          if (ctxType) {
+            // 책 단위 편집기 또는 단락 단위 편집기 모두 허용
+            const allowedTypes = ['summary', 'unit', 'whole', 'commentary'];
+            if (ctxType.startsWith('book-') || allowedTypes.includes(ctxType)) {
+              if (DEBUG) {
+                console.log('[inVerse] ✅ #sermonBody 선택 허용 (편집기)', {
+                  startInSermonBody,
+                  endInSermonBody,
+                  elInSermonBody,
+                  ctxType
+                });
+              }
+              return true; // 편집기에서는 허용
             }
-            return true;
-          }
-          // 책 단위 편집기 또는 단락 단위 편집기 모두 허용
-          const allowedTypes = ['summary', 'unit', 'whole', 'commentary'];
-          if (ctxType.startsWith('book-') || allowedTypes.includes(ctxType)) {
-            if (DEBUG) {
-              console.log('[inVerse] ✅ #sermonBody 선택 허용 (편집기)', {
-                startInSermonBody,
-                endInSermonBody,
-                elInSermonBody,
-                ctxType
-              });
-            }
-            return true; // 편집기에서는 허용
           }
           if (DEBUG) {
             console.log('[inVerse] ❌ #sermonBody 선택 제외', {
@@ -6277,7 +5670,7 @@ function createFloatingToolbar(options) {
               elClass: el.className
             });
           }
-      return false; // 다른 모드에서는 제외
+          return false; // 다른 모드에서는 제외
         }
       }
     }
