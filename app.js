@@ -841,6 +841,20 @@ function updateButtonColors(){
       }
     }
     
+    const btnExportSermons = document.getElementById('btnExportSermons');
+    if (btnExportSermons) {
+      const hasSermons = hasSermonContent();
+      if (hasSermons) {
+        btnExportSermons.style.background = 'linear-gradient(180deg, #6ea8fe 78%, #5a8fe0 72%)';
+        btnExportSermons.style.borderColor = '#5a8fe0';
+        btnExportSermons.style.color = '#fff';
+      } else {
+        btnExportSermons.style.background = '';
+        btnExportSermons.style.borderColor = '';
+        btnExportSermons.style.color = '';
+      }
+    }
+    
     // 2. 서식내보내기 버튼 - 저장된 서식이 있는지 확인
     const btnFmtExport = document.getElementById('btnFmtExport');
     if (btnFmtExport) {
@@ -898,6 +912,18 @@ function hasStoredContent(){
     return false;
   } catch (e) {
     console.error('[hasStoredContent] 오류:', e);
+    return false;
+  }
+}
+
+function hasSermonContent(){
+  try {
+    const data = loadState(STORAGE_SERMON, {});
+    if (!data || typeof data !== 'object') return false;
+    const entries = Object.values(data);
+    return entries.some(val => Array.isArray(val) ? val.length > 0 : !!val);
+  } catch (e) {
+    console.error('[hasSermonContent] 오류:', e);
     return false;
   }
 }
@@ -998,6 +1024,158 @@ function ensureUnitChips(){
     });
   });
 }
+
+// ===== [FLOATING SELECTION TOOLBAR] 선택 시 작은 툴바 노출 =====
+function _ensureFloatingPlbar(){
+  if (document.getElementById('wbp-plbar')) return;
+  const bar = document.createElement('div');
+  bar.id = 'wbp-plbar';
+  bar.setAttribute('hidden', '');
+  bar.innerHTML = `
+    <button type="button" data-cmd="bold">B</button>
+    <button type="button" data-cmd="italic">I</button>
+    <button type="button" data-cmd="underline">U</button>
+    <div class="divider"></div>
+    <input type="color" id="wbp-color-picker" title="색상 선택" style="width:34px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,.06);padding:0">
+    <div class="divider"></div>
+    <button type="button" id="wbp-save-format">저장</button>
+  `;
+  document.body.appendChild(bar);
+
+  bar.addEventListener('click', (e)=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    const cmd = btn.dataset && btn.dataset.cmd;
+    if (cmd) {
+      // try execCommand first, fallback to range wrap
+      try{ document.execCommand(cmd); }
+      catch(e){ _wrapSelectionWithTag(cmd); }
+      // keep toolbar visible
+    } else if (btn.id === 'wbp-save-format'){
+      try{ saveFormatForOpenPara(); }
+      catch(e){ console.error('saveFormatForOpenPara error', e); }
+    }
+  });
+  // 색상 입력 처리 (input 이벤트)
+  const colorInp = bar.querySelector('#wbp-color-picker');
+  if (colorInp){
+    colorInp.addEventListener('input', (ev)=>{
+      const color = ev.target.value;
+      if (!color) return;
+      try{
+        document.execCommand('foreColor', false, color);
+      }catch(e){
+        _wrapSelectionWithColor(color);
+      }
+    });
+  }
+}
+
+function _wrapSelectionWithTag(cmd){
+  const sel = document.getSelection(); if (!sel || sel.rangeCount===0) return;
+  const range = sel.getRangeAt(0);
+  const tagMap = { bold:'b', italic:'i', underline:'u' };
+  const tag = tagMap[cmd] || 'span';
+  try{
+    const el = document.createElement(tag);
+    range.surroundContents(el);
+    sel.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(el);
+    sel.addRange(newRange);
+  }catch(e){
+    console.warn('[wrapSelection] surroundContents failed:', e);
+  }
+}
+
+function _wrapSelectionWithColor(color){
+  const sel = document.getSelection(); if (!sel || sel.rangeCount===0) return;
+  const range = sel.getRangeAt(0);
+  try{
+    const el = document.createElement('span');
+    el.style.color = color;
+    range.surroundContents(el);
+    sel.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(el);
+    sel.addRange(newRange);
+  }catch(e){
+    // fallback: wrap by extracting contents
+    try{
+      const frag = range.cloneContents();
+      const wrapper = document.createElement('span'); wrapper.style.color = color;
+      wrapper.appendChild(frag);
+      range.deleteContents();
+      range.insertNode(wrapper);
+      sel.removeAllRanges();
+      const nr = document.createRange(); nr.selectNodeContents(wrapper); sel.addRange(nr);
+    }catch(err){
+      console.warn('[wrapSelectionColor] failed:', err);
+    }
+  }
+}
+
+function _posAndShowPlbar(range){
+  const bar = document.getElementById('wbp-plbar'); if(!bar) return;
+  const rect = range.getBoundingClientRect();
+  if (!rect || (rect.width===0 && rect.height===0)) return;
+  bar.removeAttribute('hidden');
+  // position relative to viewport + scroll
+  const left = rect.left + rect.width/2 + window.scrollX;
+  const top  = rect.top + window.scrollY;
+  bar.style.left = left + 'px';
+  bar.style.top  = top + 'px';
+}
+
+function _hidePlbar(){
+  const bar = document.getElementById('wbp-plbar'); if(!bar) return;
+  bar.setAttribute('hidden','');
+}
+
+function _selectionIsInOpenPara(){
+  const sel = document.getSelection(); if(!sel || sel.rangeCount===0) return null;
+  const range = sel.getRangeAt(0);
+  const node = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
+  if(!node) return null;
+  const pline = node.closest('.pline');
+  if(!pline) return null;
+  const para = pline.closest('details.para');
+  if(!para || !para.hasAttribute('open')) return null;
+  return { pline, para, range };
+}
+
+// selectionchange handler
+function _onSelectionChangeForPlbar(){
+  const ctx = _selectionIsInOpenPara();
+  if(!ctx) { _hidePlbar(); return; }
+  const sel = document.getSelection();
+  if (!sel || sel.isCollapsed) { _hidePlbar(); return; }
+  // show and position
+  _posAndShowPlbar(ctx.range);
+}
+
+// Init listeners (idempotent)
+function ensureFloatingSelectionToolbar(){
+  _ensureFloatingPlbar();
+  // avoid duplicate listeners by name-check
+  if (ensureFloatingSelectionToolbar._attached) return; ensureFloatingSelectionToolbar._attached = true;
+  document.addEventListener('selectionchange', ()=>{
+    // small timeout to let selection settle
+    setTimeout(_onSelectionChangeForPlbar, 10);
+  });
+  // hide when clicking outside
+  document.addEventListener('mousedown', (e)=>{
+    const bar = document.getElementById('wbp-plbar');
+    if (!bar) return;
+    if (e.target && (e.target.closest && e.target.closest('#wbp-plbar'))) return;
+    // allow clicks inside .pline to keep toolbar
+    if (e.target && e.target.closest && e.target.closest('.pline')) return;
+    _hidePlbar();
+  });
+}
+
+// 자동 초기화 시도
+try{ ensureFloatingSelectionToolbar(); }catch(e){ console.warn('floating toolbar init failed', e); }
+
 
 const AI_ENDPOINT = 'http://localhost:5174/api/unit-context';
 const el = id => document.getElementById(id);
@@ -1406,6 +1584,44 @@ async function importAllData(file){
   }
 }
 
+function exportSermons(){
+  const data = loadState(STORAGE_SERMON, {});
+  const payload = {
+    type: 'wbps-sermons',
+    exportedAt: new Date().toISOString(),
+    data
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  const ts = new Date();
+  const stamp = `${ts.getFullYear()}${String(ts.getMonth()+1).padStart(2,'0')}${String(ts.getDate()).padStart(2,'0')}-${String(ts.getHours()).padStart(2,'0')}${String(ts.getMinutes()).padStart(2,'0')}`;
+  a.href = URL.createObjectURL(blob);
+  a.download = `wbps-sermons-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  status('설교 데이터를 내보냈습니다.');
+}
+
+async function importSermons(file){
+  try{
+    const text = await file.text();
+    const json = JSON.parse(text);
+    const bag = json?.data ?? json;
+    if(!bag || typeof bag !== 'object'){
+      alert('설교 백업 형식이 아닙니다.');
+      return;
+    }
+    if(!confirm('설교 데이터를 덮어쓰시겠습니까?')) return;
+    saveState(STORAGE_SERMON, bag);
+    status('설교 데이터를 가져왔습니다.');
+    renderSermonList();
+  }catch(e){
+    console.error(e);
+    alert('설교 가져오기 중 오류가 발생했습니다.');
+  }
+}
+
 /* --------- Refs / State --------- */
 const voiceSelect = el('voiceSelect'), testVoiceBtn = el('testVoice');
 const rateCtl = el('rateCtl'), pitchCtl = el('pitchCtl'), voiceHint = el('voiceHint');
@@ -1414,6 +1630,8 @@ const sermonList = el('sermonList'), sermonEditor = el('sermonEditor');
 const sermonTitle = el('sermonTitle'), sermonBody = el('sermonBody');
 const editorSpeakBtn = el('editorSpeak');
 const modalFooterNew = el('modalFooterNew');
+sermonBody?.addEventListener('input', scheduleContextAutosave);
+sermonTitle?.addEventListener('input', scheduleContextAutosave);
 
 let BIBLE = null;
 let CURRENT = { book:null, chap:null, paraIdx:null, paraId:null };
@@ -1460,11 +1678,35 @@ let EDITOR_READER = { playing:false, u:null, synth:window.speechSynthesis||null 
   const btnExport = el('btnExportAll');
   const btnImport = el('btnImportAll');
   const fileInput = el('importFile');
+  const btnExportSermons = el('btnExportSermons');
+  const btnImportSermons = el('btnImportSermons');
+  let sermonFileInput = el('sermonImportFile');
+
+  if (!sermonFileInput) {
+    sermonFileInput = document.createElement('input');
+    sermonFileInput.type = 'file';
+    sermonFileInput.accept = 'application/json';
+    sermonFileInput.id = 'sermonImportFile';
+    sermonFileInput.style.display = 'none';
+    document.body.appendChild(sermonFileInput);
+  }
+
   if (btnExport) btnExport.onclick = exportAllData;
   if (btnImport) btnImport.onclick = ()=> fileInput && fileInput.click();
   if (fileInput) fileInput.addEventListener('change', (e)=>{
     const f = e.target.files?.[0]; if(!f) return;
     importAllData(f).finally(()=>{ e.target.value=''; });
+  });
+  if (btnExportSermons) btnExportSermons.onclick = exportSermons;
+  if (btnImportSermons) {
+    btnImportSermons.addEventListener('click', (e)=>{
+      e.preventDefault();
+      sermonFileInput?.click();
+    });
+  }
+  sermonFileInput?.addEventListener('change', (e)=>{
+    const f = e.target.files?.[0]; if(!f) return;
+    importSermons(f).finally(()=>{ e.target.value=''; });
   });
 })();
 
@@ -2286,7 +2528,7 @@ function setSermonMap(o, immediate = false){
   }
 }
 function getDocMap(storageKey){ return loadState(storageKey, {}); }
-function setDocMap(storageKey, obj){ saveState(storageKey, obj); }
+function setDocMap(storageKey, obj){ return saveState(storageKey, obj); }
 
 /* ✅ 프로그램 시작 시 저장된 설교목록 자동 표시 */
 function restoreSermonListOnStartup(){
@@ -2569,14 +2811,7 @@ function setupInsertVerseButton(){
 
 /* ✅ 기존 모달 기반 설교 시스템은 제거됨 - openSermonEditorDirectly 사용 */
 el('closeModal').onclick = ()=>{ 
-  // display를 먼저 none으로 설정한 후 aria-hidden을 true로 설정 (접근성 개선)
-  modalWrap.style.display='none'; 
-  // 모달이 실제로 닫힌 후에만 aria-hidden을 true로 설정
-  requestAnimationFrame(() => {
-    if (modalWrap.style.display === 'none') {
-      modalWrap.setAttribute('aria-hidden','true');
-    }
-  });
+  finalizeContextEditor();
   stopEditorSpeak(true); 
 };
 
@@ -3291,14 +3526,7 @@ function parseSermonText(text) {
 
 el('cancelEdit')?.addEventListener('click', ()=>{
   if(sermonEditor.dataset.ctxType){
-    sermonEditor.dataset.ctxType = '';
-    modalWrap.style.display = 'none'; 
-    // 모달이 실제로 닫힌 후에만 aria-hidden을 true로 설정
-    requestAnimationFrame(() => {
-      if (modalWrap.style.display === 'none') {
-        modalWrap.setAttribute('aria-hidden','true');
-      }
-    });
+    finalizeContextEditor();
   }else{
     // 설교 편집기인 경우 설교목록으로 돌아가기
     sermonEditor.style.display = 'none';
@@ -3384,40 +3612,9 @@ el('saveSermon').onclick = () => {
   //    ctxType: unit / whole / commentary / summary
   // ===============================
   if (ctxType) {
-    if (!BIBLE || !CURRENT || CURRENT.book == null ||
-        !Number.isFinite(CURRENT.chap) || !Number.isFinite(CURRENT.paraIdx)) {
-      alert('단락 정보를 찾을 수 없습니다. 먼저 단락을 선택해 주세요.');
-      return;
-    }
-
-    const para = BIBLE.books[CURRENT.book][CURRENT.chap].paras[CURRENT.paraIdx];
-    if (!para) {
-      alert('선택한 단락을 찾을 수 없습니다.');
-      return;
-    }
-
-    const pid = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
-
-    const key =
-      ctxType === 'unit'       ? STORAGE_UNIT_CTX :
-      ctxType === 'whole'      ? STORAGE_WHOLE_CTX :
-      ctxType === 'commentary' ? STORAGE_COMMENTARY :
-                                 STORAGE_SUMMARY; // 단락 내용요약
-
-    const map = getDocMap(key);
-    map[pid] = { title, body, images: imgs, date };
-    setDocMap(key, map);
-
-    sermonEditor.dataset.ctxType = '';
-    sermonEditor.classList.remove('context-editor');
-    modalWrap.style.display = 'none';
-    // 모달이 실제로 닫힌 후에만 aria-hidden을 true로 설정
-    requestAnimationFrame(() => {
-      if (modalWrap.style.display === 'none') {
-        modalWrap.setAttribute('aria-hidden', 'true');
-      }
-    });
-    status(`저장됨: ${title}`);
+    const saved = saveParagraphContext(ctxType, { silent: false });
+    if (!saved) return;
+    finalizeContextEditor();
     return;
   }
 
@@ -3489,6 +3686,87 @@ el('saveSermon').onclick = () => {
   
   status('설교가 저장되었습니다.');
 };
+
+const PARAGRAPH_CONTEXT_TYPES = ['unit', 'whole', 'commentary', 'summary'];
+const CONTEXT_AUTOSAVE_DELAY = 700;
+let contextAutoSaveTimer = null;
+
+function clearContextAutoSaveTimer(){
+  if (contextAutoSaveTimer) {
+    clearTimeout(contextAutoSaveTimer);
+    contextAutoSaveTimer = null;
+  }
+}
+
+function scheduleContextAutosave(){
+  const ctxType = sermonEditor.dataset.ctxType;
+  if (!PARAGRAPH_CONTEXT_TYPES.includes(ctxType)) return;
+
+  clearContextAutoSaveTimer();
+  contextAutoSaveTimer = setTimeout(() => {
+    saveParagraphContext(ctxType, { silent: true });
+    contextAutoSaveTimer = null;
+  }, CONTEXT_AUTOSAVE_DELAY);
+}
+
+function getParagraphContextStorageKey(ctxType){
+  switch(ctxType){
+    case 'unit': return STORAGE_UNIT_CTX;
+    case 'whole': return STORAGE_WHOLE_CTX;
+    case 'commentary': return STORAGE_COMMENTARY;
+    case 'summary': return STORAGE_SUMMARY;
+    default: return null;
+  }
+}
+
+function saveParagraphContext(ctxType, { silent = false } = {}){
+  const showAlert = !silent;
+  const key = getParagraphContextStorageKey(ctxType);
+  if (!key) return false;
+
+  if (!BIBLE || !CURRENT || CURRENT.book == null ||
+      !Number.isFinite(CURRENT.chap) || !Number.isFinite(CURRENT.paraIdx)) {
+    if (showAlert) alert('단락 정보를 찾을 수 없습니다. 먼저 단락을 선택해 주세요.');
+    return false;
+  }
+
+  const para = BIBLE.books[CURRENT.book][CURRENT.chap].paras[CURRENT.paraIdx];
+  if (!para) {
+    if (showAlert) alert('선택한 단락을 찾을 수 없습니다.');
+    return false;
+  }
+
+  const pid = `${CURRENT.book}|${CURRENT.chap}|${para.ref}`;
+  const map = getDocMap(key);
+  const title = (sermonTitle?.value || '').trim();
+  const body = (getBodyHTML() || '').trim();
+  map[pid] = { title, body, images: [], date: todayStr() };
+  const saved = setDocMap(key, map);
+
+  if (!saved && showAlert) {
+    alert('저장에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    return false;
+  }
+
+  if (saved && !silent) {
+    const label = title || '(제목 없음)';
+    status(`저장됨: ${label}`);
+  }
+
+  return saved;
+}
+
+function finalizeContextEditor(){
+  sermonEditor.dataset.ctxType = '';
+  sermonEditor.classList.remove('context-editor');
+  clearContextAutoSaveTimer();
+  modalWrap.style.display = 'none';
+  requestAnimationFrame(() => {
+    if (modalWrap.style.display === 'none') {
+      modalWrap.setAttribute('aria-hidden', 'true');
+    }
+  });
+}
 
 /* ===== RTE 유틸 ===== */
 function isRTE(){ return sermonBody && sermonBody.getAttribute('contenteditable') === 'true'; }
