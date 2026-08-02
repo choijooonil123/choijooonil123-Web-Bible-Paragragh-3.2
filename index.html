@@ -194,7 +194,7 @@
     .ptoolbar .btnUnitCtx.filled    { background:#9370db; border-color:#b48cf0; }
     .ptoolbar .btnWholeCtx.filled   { background:#4682b4; border-color:#5ca5e5; }
     .ptoolbar .btnCommentary.filled { background:#3cb371; border-color:#58d68d; }
-    .ptoolbar .sermBtn.filled       { background:#ff8c00; border-color:#ffa94d; }
+    .ptoolbar .btnSermon.filled     { background:#3cb371; border-color:#58d68d; }
     .ptoolbar button.filled::after{
       content:"●"; font-size:10px; margin-left:6px; opacity:.85; color:rgba(255,255,255,.9);
     }
@@ -1009,16 +1009,12 @@
       const b=(d.body||'').replace(/\s+/g,''); const ti=(d.title||'').replace(/\s+/g,'');
       return !!(b||ti);
     }
-    function hasSermon(sermonMap, pid){
-      const arr=(sermonMap||{})[pid]||[]; if(!Array.isArray(arr)||arr.length===0) return false;
-      return arr.some(it=> (it.body||'').replace(/\s+/g,'') || (it.title||'').replace(/\s+/g,''));
-    }
     function applyFilled(paraEl){
       const m = pickMeta(paraEl); if(!m) return;
       const pid = paraId(m.book, m.chap, m.idx); if(!pid) return;
 
       // STORAGE_* 상수는 app.js에 정의되어 있으므로, 실제 키 값 사용 또는 window 객체를 통해 접근
-      const STORAGE_SERMON_KEY = (typeof STORAGE_SERMON !== 'undefined') ? STORAGE_SERMON : 'wbps.sermons.v4';
+      const STORAGE_SERMON_DOC_KEY = (typeof STORAGE_SERMON_DOC !== 'undefined') ? STORAGE_SERMON_DOC : 'wbps.ctx.sermon.v1';
       const STORAGE_UNIT_CTX_KEY = (typeof STORAGE_UNIT_CTX !== 'undefined') ? STORAGE_UNIT_CTX : 'wbps.ctx.unit.v1';
       const STORAGE_WHOLE_CTX_KEY = (typeof STORAGE_WHOLE_CTX !== 'undefined') ? STORAGE_WHOLE_CTX : 'wbps.ctx.whole.v1';
       const STORAGE_COMMENTARY_KEY = (typeof STORAGE_COMMENTARY !== 'undefined') ? STORAGE_COMMENTARY : 'wbps.ctx.comm.v1';
@@ -1035,7 +1031,7 @@
         } catch { return {}; }
       }
       
-      const sermonMap = safe(()=> loadFromStorage(STORAGE_SERMON_KEY), {});
+      const sermonMap = safe(()=> loadFromStorage(STORAGE_SERMON_DOC_KEY), {});
       const unitMap   = safe(()=> loadFromStorage(STORAGE_UNIT_CTX_KEY), {});
       const wholeMap  = safe(()=> loadFromStorage(STORAGE_WHOLE_CTX_KEY), {});
       const commMap   = safe(()=> loadFromStorage(STORAGE_COMMENTARY_KEY), {});
@@ -1048,7 +1044,7 @@
       q('.btnUnitCtx')   ?.classList.toggle('filled', hasDoc(unitMap, pid));
       q('.btnWholeCtx')  ?.classList.toggle('filled', hasDoc(wholeMap,pid));
       q('.btnCommentary')?.classList.toggle('filled', hasDoc(commMap, pid));
-      q('.sermBtn')      ?.classList.toggle('filled', hasSermon(sermonMap, pid));
+      q('.btnSermon')    ?.classList.toggle('filled', hasDoc(sermonMap, pid));
     }
     let isSweepingFilled = false; // 무한 루프 방지 플래그
     function sweep(){ 
@@ -1107,6 +1103,7 @@
       const MUST_KEYS = [
         'wbps.versefmt.v2',            // ✅ 절문장 서식맵
         'wbps.sermons.v4',              // 설교 목록
+        'wbps.ctx.sermon.v1',            // 설교
         'wbps.ctx.unit.v1',             // 단위성경속 맥락
         'wbps.ctx.whole.v1',            // 전체성경속 맥락
         'wbps.ctx.comm.v1',             // 주석

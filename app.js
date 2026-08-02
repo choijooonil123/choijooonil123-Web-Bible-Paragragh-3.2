@@ -31,11 +31,11 @@ function ensureBookHeadChips(){
       }
 
       // 4) 설교 버튼 확보
-      let sermBtn = tb.querySelector('.sermBtn');
+      let sermBtn = tb.querySelector('.btnSermon');
       if (!sermBtn) {
         sermBtn = doc.createElement('button');
-        sermBtn.className = 'sermBtn';
-        sermBtn.textContent = '설교목록';
+        sermBtn.className = 'ctxBtn btnSermon';
+        sermBtn.textContent = '설교';
         tb.appendChild(sermBtn);
       }
 
@@ -892,7 +892,7 @@ function updateButtonColors(){
 /* ✅ 저장된 내용 데이터 확인 */
 function hasStoredContent(){
   try {
-    const keys = [STORAGE_SERMON, STORAGE_UNIT_CTX, STORAGE_WHOLE_CTX, STORAGE_COMMENTARY, STORAGE_SUMMARY];
+    const keys = [STORAGE_SERMON, STORAGE_UNIT_CTX, STORAGE_WHOLE_CTX, STORAGE_COMMENTARY, STORAGE_SERMON_DOC, STORAGE_SUMMARY];
     for (const key of keys) {
       const data = loadState(key, null);
       if (data !== null && data !== undefined) {
@@ -1237,6 +1237,7 @@ const STORAGE_LAST_SERMON_PARA = 'wbps.lastSermonPara.v4';
 const STORAGE_UNIT_CTX    = 'wbps.ctx.unit.v1';
 const STORAGE_WHOLE_CTX   = 'wbps.ctx.whole.v1';
 const STORAGE_COMMENTARY  = 'wbps.ctx.comm.v1';
+const STORAGE_SERMON_DOC  = 'wbps.ctx.sermon.v1';
 const STORAGE_SUMMARY     = 'wbps.ctx.summary.v1';
 const VOICE_CHOICE_KEY    = 'wbps.tts.choice.v2';
 
@@ -1420,7 +1421,7 @@ function saveState(key, value, options = {}) {
     
     // 버튼 색상 업데이트 (내용 또는 서식 관련 키인 경우)
     if (key === STORAGE_SERMON || key === STORAGE_UNIT_CTX || key === STORAGE_WHOLE_CTX || 
-        key === STORAGE_COMMENTARY || key === STORAGE_SUMMARY || key === 'wbps.versefmt.v2') {
+        key === STORAGE_COMMENTARY || key === STORAGE_SERMON_DOC || key === STORAGE_SUMMARY || key === 'wbps.versefmt.v2') {
       setTimeout(updateButtonColors, 100);
     }
     
@@ -1554,7 +1555,7 @@ function todayStr(){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function exportAllData(){
-  const keys = [STORAGE_SERMON, STORAGE_UNIT_CTX, STORAGE_WHOLE_CTX, STORAGE_COMMENTARY, STORAGE_SUMMARY, VOICE_CHOICE_KEY];
+  const keys = [STORAGE_SERMON, STORAGE_UNIT_CTX, STORAGE_WHOLE_CTX, STORAGE_COMMENTARY, STORAGE_SERMON_DOC, STORAGE_SUMMARY, VOICE_CHOICE_KEY];
   const payload = { __wbps:1, date: todayStr(), items:{} };
   keys.forEach(k=> payload.items[k] = loadState(k, null));
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -1909,7 +1910,7 @@ function buildTree(){
             <button class="ctxBtn btnUnitCtx">단위성경속 맥락</button>
             <button class="ctxBtn btnWholeCtx">전체성경속 맥락</button>
             <button class="ctxBtn btnCommentary">주석</button>
-            <button class="sermBtn">설교목록</button>
+            <button class="ctxBtn btnSermon">설교</button>
             <div class="spacer"></div>
           </div>
           <div class="pcontent"></div>`;
@@ -1924,11 +1925,11 @@ function buildTree(){
             sp.className = 'spacer';
             tb.appendChild(sp);
           }
-          let sermBtn = tb.querySelector('.sermBtn');
+          let sermBtn = tb.querySelector('.btnSermon');
           if (!sermBtn) {
             sermBtn = document.createElement('button');
-            sermBtn.className = 'sermBtn';
-            sermBtn.textContent = '설교목록';
+            sermBtn.className = 'ctxBtn btnSermon';
+            sermBtn.textContent = '설교';
             tb.appendChild(sermBtn);
           }
         })();
@@ -1955,9 +1956,9 @@ function buildTree(){
             status(`선택됨: ${bookName} ${chap}장 · ${para.title||para.ref}`);
             // 열릴 때 설교 버튼 누락 시 즉시 생성 (클릭 바인딩 없음)
             const tb = detPara.querySelector('.ptoolbar');
-            if (tb && !tb.querySelector('.sermBtn')) {
+            if (tb && !tb.querySelector('.btnSermon')) {
               const btn = document.createElement('button');
-              btn.className = 'sermBtn';
+              btn.className = 'ctxBtn btnSermon';
               btn.textContent = '설교';
               tb.appendChild(btn);
             }
@@ -1972,6 +1973,7 @@ function buildTree(){
         body.querySelector('.btnUnitCtx').addEventListener('click', ()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('unit'); }); // 단위성경속 편집기 호출
         body.querySelector('.btnWholeCtx').addEventListener('click',()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('whole'); }); // 전체성경속 편집기 호출
         body.querySelector('.btnCommentary').addEventListener('click',()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('commentary'); }); // 주석 편집기 호출
+        body.querySelector('.btnSermon').addEventListener('click',()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('sermon'); }); // 설교 편집기 호출
         body.querySelector('.btnSummary').addEventListener('click',   ()=>{ CURRENT.book=bookName; CURRENT.chap=chap; CURRENT.paraIdx=idx; openSingleDocEditor('summary'); }); // 내용흐름 편집기 호출
 
         parWrap.appendChild(detPara);
@@ -1999,9 +2001,9 @@ function buildTree(){
       sp.className = 'spacer';
       tb.insertBefore(sp, tb.firstChild);
     }
-    if (!tb.querySelector('.sermBtn')) {
+    if (!tb.querySelector('.btnSermon')) {
       const b = document.createElement('button');
-      b.className = 'sermBtn';
+      b.className = 'ctxBtn btnSermon';
       b.textContent = '설교';
       tb.appendChild(b);
     }
@@ -2027,7 +2029,7 @@ function buildTree(){
 /* ✅ 트리 렌더 후 설교 버튼이 누락됐을 때 자동 보강(클릭 바인딩 없음) */
 function ensureSermonButtons(){
   document.querySelectorAll('#tree details.para .ptoolbar').forEach(tb=>{
-    if (tb.querySelector('.sermBtn')) return;
+    if (tb.querySelector('.btnSermon')) return;
 
     let spacer = tb.querySelector('.spacer');
     if (!spacer) {
@@ -2037,7 +2039,7 @@ function ensureSermonButtons(){
     }
 
     const btn = document.createElement('button');
-    btn.className = 'sermBtn';
+    btn.className = 'ctxBtn btnSermon';
     btn.textContent = '설교';
     tb.appendChild(btn);
   });
@@ -2045,7 +2047,7 @@ function ensureSermonButtons(){
 
 /* 🔧 트리 위임 클릭 공용 처리 (유일한 클릭 바인딩) */
 treeEl.addEventListener('click', (e)=>{
-  const isCtxBtn = e.target.closest('.btnSummary, .btnUnitCtx, .btnWholeCtx, .btnCommentary, .sermBtn');
+  const isCtxBtn = e.target.closest('.btnSummary, .btnUnitCtx, .btnWholeCtx, .btnCommentary, .btnSermon');
   if (!isCtxBtn) return;
 
   const paraEl = e.target.closest('details.para');
@@ -2063,7 +2065,7 @@ treeEl.addEventListener('click', (e)=>{
   if (e.target.closest('.btnUnitCtx'))    { openSingleDocEditor('unit');       return; }
   if (e.target.closest('.btnWholeCtx'))   { openSingleDocEditor('whole');      return; }
   if (e.target.closest('.btnCommentary')) { openSingleDocEditor('commentary'); return; }
-  if (e.target.closest('.sermBtn'))       { openSermonListModal();             return; }
+  if (e.target.closest('.btnSermon'))     { openSingleDocEditor('sermon');     return; }
 
   // === [BOOK-CHIP → '내용흐름' 편집기 동일 사용] =========================
   const chip = e.target.closest('.book-chip[data-type="basic"], .book-chip[data-type="structure"], .book-chip[data-type="summary"]');
@@ -2828,12 +2830,14 @@ function openSingleDocEditor(kind){
     kind==='unit'       ? '단위성경속 맥락' :
     kind==='whole'      ? '전체성경속 맥락' :
     kind==='commentary' ? '주석' :
+    kind==='sermon'     ? '설교' :
                            '내용요약';
 
   const key =
     kind==='unit'       ? STORAGE_UNIT_CTX :
     kind==='whole'      ? STORAGE_WHOLE_CTX :
     kind==='commentary' ? STORAGE_COMMENTARY :
+    kind==='sermon'     ? STORAGE_SERMON_DOC :
                            STORAGE_SUMMARY;
 
   const map = getDocMap(key);
@@ -3687,7 +3691,7 @@ el('saveSermon').onclick = () => {
   status('설교가 저장되었습니다.');
 };
 
-const PARAGRAPH_CONTEXT_TYPES = ['unit', 'whole', 'commentary', 'summary'];
+const PARAGRAPH_CONTEXT_TYPES = ['unit', 'whole', 'commentary', 'sermon', 'summary'];
 const CONTEXT_AUTOSAVE_DELAY = 700;
 let contextAutoSaveTimer = null;
 
@@ -3714,6 +3718,7 @@ function getParagraphContextStorageKey(ctxType){
     case 'unit': return STORAGE_UNIT_CTX;
     case 'whole': return STORAGE_WHOLE_CTX;
     case 'commentary': return STORAGE_COMMENTARY;
+    case 'sermon': return STORAGE_SERMON_DOC;
     case 'summary': return STORAGE_SUMMARY;
     default: return null;
   }
